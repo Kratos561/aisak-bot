@@ -1,0 +1,17 @@
+.env
+.venv/
+.venv_verify/
+.hfdebug/
+.ytprobe/
+.tmp-bgutil-provider/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+data/logs/*.log
+data/cache/
+data/favorites/
+data/simulate_*.json
+.pytest_cache/
+.mypy_cache/
+scripts/__pycache__/
