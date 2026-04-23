@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: aisak-bot
+    runtime: docker
+    plan: free
+    region: oregon
+    healthCheckPath: /health
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    autoDeploy: true
+    envVars:
+      - key: DISCORD_TOKEN
+        sync: false
+      - key: TEST_GUILD_IDS
+        value: 1480142471697530933,1275282755063779459
+      - key: LOG_LEVEL
+        value: INFO
