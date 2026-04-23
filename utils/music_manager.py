@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from concurrent.futures import Future
 from typing import Iterable
 
 import discord
@@ -14,8 +15,17 @@ from utils.models import GuildMusicState, MessageRef, RepeatMode, Track
 from utils.player_controls import PlayerControlsView
 from utils.validators import is_url
 
-FFMPEG_BEFORE_OPTIONS = "-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5 -nostdin"
-FFMPEG_OPTIONS = "-vn -sn -dn -af aresample=resampler=soxr:precision=28 -loglevel warning"
+FFMPEG_BEFORE_OPTIONS = (
+    "-reconnect 1 "
+    "-reconnect_streamed 1 "
+    "-reconnect_at_eof 1 "
+    "-reconnect_on_network_error 1 "
+    '-reconnect_on_http_error 4xx,5xx '
+    "-thread_queue_size 1024 "
+    "-reconnect_delay_max 10 "
+    "-nostdin"
+)
+FFMPEG_OPTIONS = "-vn -sn -dn -bufsize 64K -loglevel warning"
 
 
 class MusicManager:
@@ -188,7 +198,14 @@ class MusicManager:
             return None
 
     def _after_playback(self, guild_id: int, error: Exception | None) -> None:
-        future = asyncio.run_coroutine_threadsafe(self._handle_after_playback(guild_id, error), self.bot.loop)
+        try:
+            future = asyncio.run_coroutine_threadsafe(self._handle_after_playback(guild_id, error), self.bot.loop)
+        except RuntimeError:  # pragma: no cover - runtime path
+            self.logger.exception("No pude programar el fin de reproduccion en guild=%s", guild_id)
+            return
+        future.add_done_callback(lambda done, gid=guild_id: self._log_after_playback_result(gid, done))
+
+    def _log_after_playback_result(self, guild_id: int, future: Future[None]) -> None:
         try:
             future.result()
         except Exception:  # pragma: no cover - runtime path
@@ -212,10 +229,12 @@ class MusicManager:
 
         if current is not None:
             if state.repeat_mode == RepeatMode.ONE and not state.manual_skip:
+                self._invalidate_track_stream_cache(current)
                 state.queue.appendleft(current)
             else:
                 state.history.append(current)
                 if state.repeat_mode == RepeatMode.ALL and not state.manual_skip:
+                    self._invalidate_track_stream_cache(current)
                     state.queue.append(current)
 
         state.manual_skip = False
@@ -393,7 +412,7 @@ class MusicManager:
         options = [
             FFMPEG_BEFORE_OPTIONS,
             "-protocol_whitelist file,http,https,tcp,tls,crypto",
-            "-rw_timeout 15000000",
+            "-rw_timeout 8000000",
         ]
 
         if track.stream_headers:
@@ -412,6 +431,10 @@ class MusicManager:
         if isinstance(exc, PlaybackError):
             return f"No pude reproducir **{track.title}**: {exc} Pase al siguiente tema."
         return f"No pude reproducir **{track.title}** por un fallo interno. Pase al siguiente tema."
+
+    def _invalidate_track_stream_cache(self, track: Track) -> None:
+        track.stream_url = None
+        track.stream_headers.clear()
 
     async def _enqueue_autoplay_track(self, state: GuildMusicState, seed_track: Track) -> None:
         requester_id = self.bot.user.id if self.bot.user else 0
