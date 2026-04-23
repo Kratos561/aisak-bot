@@ -261,6 +261,7 @@ class FakeInteraction:
         self.guild_id = guild.id
         self.channel_id = 444
         self.channel = FakeTextChannel([], channel_id=self.channel_id)
+        self._sink = sink
         self.user = SimpleNamespace(
             id=123,
             display_name="SimTester",
@@ -273,6 +274,37 @@ class FakeInteraction:
         self.message: FakeMessage | None = None
 
     async def original_response(self) -> FakeMessage:
+        return self._original_response
+
+    async def edit_original_response(
+        self,
+        *,
+        content: str | None = None,
+        embed: discord.Embed | None = None,
+        embeds: list[discord.Embed] | None = None,
+        view: discord.ui.View | None = None,
+    ) -> FakeMessage:
+        if self._original_response is None:
+            self._original_response = self.channel.create_message(
+                content=content,
+                embed=embed if embeds is None else None,
+                view=view,
+            )
+            if embeds is not None:
+                self._original_response.embeds = embeds
+        else:
+            await self._original_response.edit(content=content, embed=embed, embeds=embeds, view=view)
+
+        self._sink.append(
+            {
+                "kind": "edit_original_response",
+                "content": self._original_response.content,
+                "embed": self._original_response.embeds[0] if self._original_response.embeds else None,
+                "ephemeral": self._original_response.ephemeral,
+                "view": type(self._original_response.view).__name__ if self._original_response.view else None,
+                "message_id": self._original_response.id,
+            }
+        )
         return self._original_response
 
 
@@ -318,6 +350,9 @@ async def run_case(
     cog_class: type[MusicCog] | type[SearchCog],
     command_name: str,
     *command_args: Any,
+    fail_register_track_message: bool = False,
+    stub_single_track_playback: bool = False,
+    settle_seconds: float = 5.0,
 ) -> dict[str, Any]:
     sink: list[dict[str, Any]] = []
     bot = FakeBot()
@@ -328,9 +363,43 @@ async def run_case(
     interaction.channel.messages = bot.channel_messages
     bot.channels[interaction.channel_id] = interaction.channel
 
+    if stub_single_track_playback:
+        async def _stub_enqueue_query(fake_interaction: FakeInteraction, query: str, source: str = "auto") -> list[Track]:
+            state = bot.music.get_state(fake_interaction.guild_id)
+            state.text_channel_id = fake_interaction.channel_id
+            if state.voice_client is None:
+                state.voice_client = await fake_interaction.user.voice.channel.connect()
+
+            track = Track(
+                title=f"Simulated {query}",
+                webpage_url="https://example.com/tracks/simulated",
+                stream_url="https://example.com/tracks/simulated.mp3",
+                duration=210,
+                source=source,
+                requester_id=fake_interaction.user.id,
+                requester_name=fake_interaction.user.display_name,
+                search_query=query,
+            )
+            state.current = track
+            state.reset_progress()
+            state.voice_client._playing = True
+            return [track]
+
+        bot.music.enqueue_query = _stub_enqueue_query  # type: ignore[method-assign]
+
+    if fail_register_track_message:
+        async def _failing_register_track_message(*args: Any, **kwargs: Any) -> None:
+            raise RuntimeError("simulated register_track_message failure")
+
+        bot.music.register_track_message = _failing_register_track_message  # type: ignore[method-assign]
+
     command = getattr(cog, command_name).callback
-    await command(cog, interaction, *command_args)
-    await asyncio.sleep(5)
+    error: str | None = None
+    try:
+        await command(cog, interaction, *command_args)
+    except Exception as exc:
+        error = f"{type(exc).__name__}: {exc}"
+    await asyncio.sleep(settle_seconds)
 
     state = bot.music.get_state(guild.id)
     final_track = _resolve_final_track(state)
@@ -355,48 +424,182 @@ async def run_case(
         "final_track": _track_snapshot(final_track),
         "queue_length": len(state.queue),
         "history_length": len(state.history),
+        "error": error,
+    }
+
+
+async def run_queue_response_case(case_name: str) -> dict[str, Any]:
+    first_sink: list[dict[str, Any]] = []
+    second_sink: list[dict[str, Any]] = []
+    bot = FakeBot()
+    cog = MusicCog(bot)
+    guild = FakeGuild(9200, bot.user.id)
+    voice_channel = FakeVoiceChannel(guild)
+    channel = FakeTextChannel(bot.channel_messages, channel_id=444)
+    bot.channels[channel.id] = channel
+    queued_track: Track | None = None
+
+    async def _stub_enqueue_query(fake_interaction: FakeInteraction, query: str, source: str = "auto") -> list[Track]:
+        nonlocal queued_track
+        state = bot.music.get_state(fake_interaction.guild_id)
+        state.text_channel_id = fake_interaction.channel_id
+        if state.voice_client is None:
+            state.voice_client = await fake_interaction.user.voice.channel.connect()
+
+        if state.current is None:
+            current_track = Track(
+                title="Simulated Primera",
+                webpage_url="https://example.com/tracks/primera",
+                stream_url="https://example.com/tracks/primera.mp3",
+                duration=210,
+                source=source,
+                requester_id=fake_interaction.user.id,
+                requester_name=fake_interaction.user.display_name,
+                search_query=query,
+            )
+            state.current = current_track
+            state.reset_progress()
+            state.voice_client._playing = True
+            return [current_track]
+
+        queued_track = Track(
+            title="Simulated Segunda",
+            webpage_url="https://example.com/tracks/segunda",
+            duration=180,
+            source=source,
+            requester_id=fake_interaction.user.id,
+            requester_name=fake_interaction.user.display_name,
+            search_query=query,
+        )
+        state.queue.append(queued_track)
+        return [queued_track]
+
+    bot.music.enqueue_query = _stub_enqueue_query  # type: ignore[method-assign]
+
+    register_calls = 0
+
+    async def _selective_register(*args: Any, **kwargs: Any) -> None:
+        nonlocal register_calls
+        register_calls += 1
+        if register_calls >= 2:
+            raise RuntimeError("simulated register_track_message failure on queued track")
+
+    bot.music.register_track_message = _selective_register  # type: ignore[method-assign]
+
+    first_interaction = FakeInteraction(guild, voice_channel, first_sink)
+    first_interaction.channel = channel
+    first_interaction.channel_id = channel.id
+    await cog.play.callback(cog, first_interaction, "Primera", app_commands.Choice(name="auto", value="auto"))
+
+    second_interaction = FakeInteraction(guild, voice_channel, second_sink)
+    second_interaction.channel = channel
+    second_interaction.channel_id = channel.id
+    error: str | None = None
+    try:
+        await cog.play.callback(cog, second_interaction, "Segunda", app_commands.Choice(name="auto", value="auto"))
+    except Exception as exc:
+        error = f"{type(exc).__name__}: {exc}"
+
+    state = bot.music.get_state(guild.id)
+    return {
+        "case": case_name,
+        "responses": [
+            {
+                "step": "first",
+                "kind": item["kind"],
+                "title": item["embed"].title if item.get("embed") else None,
+                "description": item["embed"].description if item.get("embed") else item.get("content"),
+                "view": item.get("view"),
+            }
+            for item in first_sink
+        ]
+        + [
+            {
+                "step": "second",
+                "kind": item["kind"],
+                "title": item["embed"].title if item.get("embed") else None,
+                "description": item["embed"].description if item.get("embed") else item.get("content"),
+                "view": item.get("view"),
+            }
+            for item in second_sink
+        ],
+        "current_track": _track_snapshot(state.current),
+        "queued_track": _track_snapshot(state.queue[0]) if state.queue else _track_snapshot(queued_track),
+        "queue_length": len(state.queue),
+        "error": error,
     }
 
 
 async def main() -> None:
     soundcloud_choice = app_commands.Choice(name="auto", value="auto")
     playlist_url = "https://youtube.com/playlist?list=PL_ZVTvNsmBNYtGwPsmJ6xy1BvPCjSkYux&si=Yqmgi55edRY5oEm9"
+    selected_cases = set(sys.argv[1:])
+    results: list[dict[str, Any]] = []
 
-    results = [
-        await run_case(
+    async def add_case(
+        case_name: str,
+        cog_class: type[MusicCog] | type[SearchCog],
+        command_name: str,
+        *command_args: Any,
+        **case_kwargs: Any,
+    ) -> None:
+        if selected_cases and case_name not in selected_cases:
+            return
+        results.append(await run_case(case_name, cog_class, command_name, *command_args, **case_kwargs))
+
+    await add_case(
             "search_auto_acido_iii",
             SearchCog,
             "search",
             "ACIDO III",
             soundcloud_choice,
-        ),
-        await run_case(
+        )
+    await add_case(
             "play_auto_acido_iii",
             MusicCog,
             "play",
             "ACIDO III",
             soundcloud_choice,
-        ),
-        await run_case(
+        )
+    await add_case(
+            "play_local_register_panel_failure_keeps_response",
+            MusicCog,
+            "play",
+            "ACIDO III",
+            soundcloud_choice,
+            stub_single_track_playback=True,
+            fail_register_track_message=True,
+            settle_seconds=0.05,
+        )
+    await add_case(
             "play_soundcloud_url_acido_iii",
             MusicCog,
             "play",
             "https://soundcloud.com/goodcookie-002/acido-iii-1",
             app_commands.Choice(name="soundcloud", value="soundcloud"),
-        ),
-        await run_case(
+        )
+    await add_case(
+            "play_register_panel_failure_keeps_response",
+            MusicCog,
+            "play",
+            "ACIDO III",
+            soundcloud_choice,
+            fail_register_track_message=True,
+        )
+    await add_case(
             "play_mixcloud_direct_url",
             MusicCog,
             "mixcloud",
             "https://www.mixcloud.com/dholbach/cryptkeeper/",
-        ),
-        await run_case(
+        )
+    await add_case(
             "playlist_youtube_ordered_queue",
             MusicCog,
             "playlist",
             playlist_url,
-        ),
-    ]
+        )
+    if not selected_cases or "play_second_track_queue_response_keeps_message" in selected_cases:
+        results.append(await run_queue_response_case("play_second_track_queue_response_keeps_message"))
     print(json.dumps(results, ensure_ascii=False, indent=2))
 
 
