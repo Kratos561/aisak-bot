@@ -70,9 +70,16 @@ class MusicCog(commands.Cog):
             )
             view = None
 
+        message: discord.InteractionMessage | None = None
         try:
-            message = await interaction.followup.send(embed=embed, view=view, wait=True)
-            if len(tracks) == 1 and message is not None:
+            message = await interaction.edit_original_response(embed=embed, view=view)
+        except Exception:
+            self.bot.logger.exception("Fallo enviando la respuesta deferida de /play en guild=%s", interaction.guild_id)
+            if not self.music.is_playing(interaction.guild_id):
+                raise
+
+        if len(tracks) == 1 and message is not None:
+            try:
                 await self.music.register_track_message(
                     interaction.guild_id,
                     tracks[0],
@@ -81,10 +88,12 @@ class MusicCog(commands.Cog):
                     activate=bool(active_track),
                     heading=heading or "Reproduccion iniciada",
                 )
-        except Exception:
-            self.bot.logger.exception("Fallo enviando o registrando la respuesta de /play en guild=%s", interaction.guild_id)
-            if not self.music.is_playing(interaction.guild_id):
-                raise
+            except Exception:
+                self.bot.logger.exception(
+                    "Fallo registrando el panel de /play en guild=%s track=%s",
+                    interaction.guild_id,
+                    tracks[0].id,
+                )
 
     def _build_single_track_response(self, track: Track, state: GuildMusicState) -> discord.Embed:
         current = state.current
