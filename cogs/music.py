@@ -70,26 +70,31 @@ class MusicCog(commands.Cog):
             )
             view = None
 
-        message = await interaction.followup.send(embed=embed, view=view, wait=True)
-        if len(tracks) == 1 and message is not None:
-            await self.music.register_track_message(
-                interaction.guild_id,
-                tracks[0],
-                channel_id=message.channel.id,
-                message_id=message.id,
-                activate=bool(active_track),
-                heading=heading or "Reproduccion iniciada",
-            )
+        try:
+            message = await interaction.followup.send(embed=embed, view=view, wait=True)
+            if len(tracks) == 1 and message is not None:
+                await self.music.register_track_message(
+                    interaction.guild_id,
+                    tracks[0],
+                    channel_id=message.channel.id,
+                    message_id=message.id,
+                    activate=bool(active_track),
+                    heading=heading or "Reproduccion iniciada",
+                )
+        except Exception:
+            self.bot.logger.exception("Fallo enviando o registrando la respuesta de /play en guild=%s", interaction.guild_id)
+            if not self.music.is_playing(interaction.guild_id):
+                raise
 
     def _build_single_track_response(self, track: Track, state: GuildMusicState) -> discord.Embed:
         current = state.current
         started_this_track = bool(
             current
-            and current.webpage_url == track.webpage_url
+            and current.id == track.id
             and state.voice_client
             and state.voice_client.is_connected()
         )
-        queued_this_track = any(item.webpage_url == track.webpage_url for item in state.queue)
+        queued_this_track = any(item.id == track.id for item in state.queue)
 
         if started_this_track:
             return build_track_embed(
@@ -211,7 +216,7 @@ class MusicCog(commands.Cog):
         current = state.current
         if (
             current
-            and current.webpage_url == track.webpage_url
+            and current.id == track.id
             and state.voice_client
             and state.voice_client.is_connected()
         ):

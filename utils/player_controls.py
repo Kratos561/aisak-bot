@@ -41,7 +41,7 @@ class PlayerControlsView(discord.ui.View):
         like_button.label = "Like"
         like_button.style = discord.ButtonStyle.secondary
 
-        if state and state.voice_client and state.voice_client.is_paused():
+        if state and state.voice_client and callable(getattr(state.voice_client, "is_paused", None)) and state.voice_client.is_paused():
             pause_button.label = "Resume"
             pause_button.style = discord.ButtonStyle.success
         else:

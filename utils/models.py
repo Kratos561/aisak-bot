@@ -5,6 +5,7 @@ from collections import deque
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from enum import Enum
+from uuid import uuid4
 
 import discord
 
@@ -28,6 +29,7 @@ class Track:
     search_query: str | None = None
     requester_id: int | None = None
     requester_name: str | None = None
+    id: str = field(default_factory=lambda: uuid4().hex)
 
 
 @dataclass(slots=True)
@@ -56,7 +58,7 @@ class GuildMusicState:
     manual_skip: bool = False
     manual_stop: bool = False
     active_panel: MessageRef | None = None
-    active_panel_track_url: str | None = None
+    active_panel_track_id: str | None = None
     track_messages: dict[str, MessageRef] = field(default_factory=dict)
 
     def reset_progress(self) -> None:

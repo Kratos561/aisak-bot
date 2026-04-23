@@ -457,9 +457,10 @@ class AudioService:
             key=lambda item: (
                 1 if item.get("vcodec") == "none" else 0,
                 1 if str(item.get("protocol", "")).startswith("http") else 0,
-                1 if item.get("ext") == "m4a" else 0,
                 item.get("abr") or 0,
                 item.get("asr") or 0,
+                1 if item.get("acodec") in {"opus", "vorbis"} else 0,
+                1 if item.get("ext") in {"webm", "m4a"} else 0,
             ),
         )
         if not selected:

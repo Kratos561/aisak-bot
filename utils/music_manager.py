@@ -15,7 +15,7 @@ from utils.player_controls import PlayerControlsView
 from utils.validators import is_url
 
 FFMPEG_BEFORE_OPTIONS = "-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5 -nostdin"
-FFMPEG_OPTIONS = "-vn -sn -dn -loglevel warning"
+FFMPEG_OPTIONS = "-vn -sn -dn -af aresample=resampler=soxr:precision=28 -loglevel warning"
 
 
 class MusicManager:
@@ -331,10 +331,19 @@ class MusicManager:
 
     def is_playing(self, guild_id: int) -> bool:
         state = self.get_state(guild_id)
+        voice_client = state.voice_client
+        if not voice_client:
+            return False
+        is_connected = getattr(voice_client, "is_connected", None)
+        is_playing = getattr(voice_client, "is_playing", None)
+        is_paused = getattr(voice_client, "is_paused", None)
         return bool(
-            state.voice_client
-            and state.voice_client.is_connected()
-            and (state.voice_client.is_playing() or state.voice_client.is_paused())
+            callable(is_connected)
+            and is_connected()
+            and (
+                (callable(is_playing) and is_playing())
+                or (callable(is_paused) and is_paused())
+            )
         )
 
     async def _schedule_auto_disconnect(self, state: GuildMusicState) -> None:
@@ -468,13 +477,13 @@ class MusicManager:
     ) -> None:
         state = self.get_state(guild_id)
         ref = MessageRef(channel_id=channel_id, message_id=message_id)
-        state.track_messages[track.webpage_url] = ref
-        if activate:
+        state.track_messages[track.id] = ref
+        if activate and state.current and state.current.id == track.id:
             await self.promote_track_message(guild_id, track, heading=heading)
 
     async def promote_track_message(self, guild_id: int, track: Track, *, heading: str) -> None:
         state = self.get_state(guild_id)
-        target_ref = state.track_messages.get(track.webpage_url) or state.active_panel
+        target_ref = state.track_messages.get(track.id) or state.active_panel
         if target_ref is None:
             return
 
@@ -497,7 +506,7 @@ class MusicManager:
             view=PlayerControlsView(self.bot, guild_id),
         )
         state.active_panel = target_ref
-        state.active_panel_track_url = track.webpage_url
+        state.active_panel_track_id = track.id
 
     async def refresh_active_panel(
         self,
@@ -513,7 +522,7 @@ class MusicManager:
         message = await self._fetch_message(state.active_panel)
         if message is None:
             state.active_panel = None
-            state.active_panel_track_url = None
+            state.active_panel_track_id = None
             return
 
         if state.current is None:
@@ -526,7 +535,7 @@ class MusicManager:
                 view=None,
             )
             state.active_panel = None
-            state.active_panel_track_url = None
+            state.active_panel_track_id = None
             return
 
         if dashboard:
@@ -549,7 +558,7 @@ class MusicManager:
             ),
             view=PlayerControlsView(self.bot, guild_id),
         )
-        state.active_panel_track_url = state.current.webpage_url
+        state.active_panel_track_id = state.current.id
 
     async def disable_active_panel(self, guild_id: int) -> None:
         state = self.get_state(guild_id)
@@ -558,10 +567,10 @@ class MusicManager:
                 state.active_panel,
                 finished_track=state.history[-1] if state.history else None,
             )
-        if state.active_panel_track_url:
-            state.track_messages.pop(state.active_panel_track_url, None)
+        if state.active_panel_track_id:
+            state.track_messages.pop(state.active_panel_track_id, None)
         state.active_panel = None
-        state.active_panel_track_url = None
+        state.active_panel_track_id = None
 
     async def _clear_message_controls(self, ref: MessageRef, finished_track: Track | None = None) -> None:
         message = await self._fetch_message(ref)
