@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import difflib
 import logging
+import os
 import re
 from typing import Any
 
@@ -57,6 +58,7 @@ class AudioService:
         self.settings = settings
         self.logger = logger.getChild("audio")
         self.spotify_client = self._build_spotify_client()
+        self.proxy_override = self._build_proxy_override()
 
     def _build_spotify_client(self) -> Any | None:
         if not self.settings.spotify_client_id or not self.settings.spotify_client_secret:
@@ -70,6 +72,34 @@ class AudioService:
             client_secret=self.settings.spotify_client_secret,
         )
         return spotipy.Spotify(auth_manager=auth_manager)
+
+    def _build_proxy_override(self) -> str | None:
+        proxy_candidates = [
+            os.getenv(name, "").strip()
+            for name in (
+                "HTTP_PROXY",
+                "HTTPS_PROXY",
+                "ALL_PROXY",
+                "http_proxy",
+                "https_proxy",
+                "all_proxy",
+            )
+        ]
+        proxy_candidates = [value for value in proxy_candidates if value]
+        if not proxy_candidates:
+            return None
+
+        normalized = {value.lower().rstrip("/") for value in proxy_candidates}
+        invalid_loopback_proxies = {
+            "http://127.0.0.1:9",
+            "https://127.0.0.1:9",
+            "http://localhost:9",
+            "https://localhost:9",
+        }
+        if normalized.issubset(invalid_loopback_proxies):
+            self.logger.warning("Se detecto un proxy local invalido; yt-dlp lo ignorara para evitar fallos de red.")
+            return ""
+        return None
 
     async def fetch_tracks(
         self,
@@ -369,6 +399,9 @@ class AudioService:
             "geo_bypass": True,
         }
 
+        if self.proxy_override is not None:
+            options["proxy"] = self.proxy_override
+
         if source == "youtube":
             extractor_args: dict[str, dict[str, list[str]]] = {
                 "youtube": {
@@ -426,6 +459,32 @@ class AudioService:
 
     def _extract_stream_candidate(self, info: dict[str, Any]) -> tuple[str | None, dict[str, str]]:
         formats = info.get("formats") or []
+        direct_url = info.get("url")
+        direct_headers = self._normalize_headers(info.get("http_headers"))
+        audio_only_formats = [
+            item
+            for item in formats
+            if item.get("url")
+            and item.get("acodec") not in (None, "none")
+            and item.get("vcodec") == "none"
+            and not self._is_fragmented_stream_protocol(item)
+        ]
+        selected = self._pick_best_format(
+            audio_only_formats,
+            key=lambda item: (
+                1 if str(item.get("protocol", "")).startswith("http") else 0,
+                item.get("abr") or 0,
+                item.get("asr") or 0,
+                1 if item.get("acodec") in {"opus", "vorbis"} else 0,
+                1 if item.get("ext") in {"webm", "m4a"} else 0,
+            ),
+        )
+        if selected:
+            return selected.get("url"), self._normalize_headers(selected.get("http_headers") or info.get("http_headers"))
+
+        if direct_url and (not self._is_youtube_info(info) or info.get("vcodec") == "none" or not formats):
+            return direct_url, direct_headers
+
         if self._is_youtube_info(info):
             progressive_formats = [
                 item
@@ -434,6 +493,7 @@ class AudioService:
                 and item.get("acodec") not in (None, "none")
                 and item.get("vcodec") not in (None, "none")
                 and item.get("ext") == "mp4"
+                and not self._is_fragmented_stream_protocol(item)
                 and str(item.get("protocol", "")).startswith(("http", "m3u8"))
             ]
             selected = self._pick_best_format(
@@ -447,13 +507,15 @@ class AudioService:
             if selected:
                 return selected.get("url"), self._normalize_headers(selected.get("http_headers") or info.get("http_headers"))
 
-        direct_url = info.get("url")
-        if direct_url:
-            return direct_url, self._normalize_headers(info.get("http_headers"))
-
-        audio_formats = [item for item in formats if item.get("acodec") not in (None, "none") and item.get("url")]
+        fallback_audio_formats = [
+            item
+            for item in formats
+            if item.get("url")
+            and item.get("acodec") not in (None, "none")
+            and not self._is_fragmented_stream_protocol(item)
+        ]
         selected = self._pick_best_format(
-            audio_formats,
+            fallback_audio_formats,
             key=lambda item: (
                 1 if item.get("vcodec") == "none" else 0,
                 1 if str(item.get("protocol", "")).startswith("http") else 0,
@@ -464,6 +526,8 @@ class AudioService:
             ),
         )
         if not selected:
+            if direct_url:
+                return direct_url, direct_headers
             return None, {}
 
         return selected.get("url"), self._normalize_headers(selected.get("http_headers") or info.get("http_headers"))
@@ -559,6 +623,10 @@ class AudioService:
             return None
         formats.sort(key=key, reverse=True)
         return formats[0]
+
+    def _is_fragmented_stream_protocol(self, format_info: dict[str, Any]) -> bool:
+        protocol = str(format_info.get("protocol") or "").lower()
+        return protocol == "http_dash_segments"
 
     def _normalize_headers(self, headers: dict[str, Any] | None) -> dict[str, str]:
         if not headers:
