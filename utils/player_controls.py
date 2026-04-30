@@ -1,9 +1,8 @@
 from __future__ import annotations
 
-import asyncio
-
 import discord
 
+from utils.errors import AISAKError
 from utils.favorites import FavoriteStore
 from utils.formatters import (
     build_error_embed,
@@ -36,9 +35,9 @@ class PlayerControlsView(discord.ui.View):
         skip_button.style = discord.ButtonStyle.secondary
         stop_button.label = "Stop"
         stop_button.style = discord.ButtonStyle.danger
-        dashboard_button.label = "Panel"
+        dashboard_button.label = "Queue"
         dashboard_button.style = discord.ButtonStyle.secondary
-        like_button.label = "Like"
+        like_button.label = "Save"
         like_button.style = discord.ButtonStyle.secondary
 
         if state and state.voice_client and callable(getattr(state.voice_client, "is_paused", None)) and state.voice_client.is_paused():
@@ -75,6 +74,17 @@ class PlayerControlsView(discord.ui.View):
             except discord.HTTPException:
                 pass
             return False
+        try:
+            self.music.assert_control_access(interaction)
+        except AISAKError as exc:
+            if interaction.response.is_done():
+                await interaction.followup.send(embed=build_error_embed(str(exc), self.bot.settings.bot_color), ephemeral=True)
+            else:
+                await interaction.response.send_message(
+                    embed=build_error_embed(str(exc), self.bot.settings.bot_color),
+                    ephemeral=True,
+                )
+            return False
         return True
 
     @discord.ui.button(label="Pause", style=discord.ButtonStyle.primary, custom_id="aisak:pause_resume", row=0)
@@ -98,7 +108,7 @@ class PlayerControlsView(discord.ui.View):
         try:
             await interaction.response.defer()
             await self.music.skip(interaction.guild_id, 1)
-            await asyncio.sleep(0.35)
+            await self.music.wait_for_transition(interaction.guild_id)
             state = self.music.get_state(interaction.guild_id)
             if state.current:
                 await self.music.refresh_active_panel(interaction.guild_id, heading="Reproduccion iniciada")
@@ -192,7 +202,12 @@ class PlayerControlsView(discord.ui.View):
                 )
                 return
         if not interaction.response.is_done():
-            await interaction.response.defer()
+            await interaction.response.defer(ephemeral=True)
+        if interaction.guild_id is not None:
+            await interaction.followup.send(
+                embed=build_error_embed(message, self.bot.settings.bot_color),
+                ephemeral=True,
+            )
 
     async def _active_message(self, guild_id: int):
         state = self.music.get_state(guild_id)

@@ -16,6 +16,15 @@ class RepeatMode(str, Enum):
     ALL = "all"
 
 
+class AudioFilterPreset(str, Enum):
+    OFF = "off"
+    BASSBOOST = "bassboost"
+    CLEAR = "clear"
+    RADIO = "radio"
+    NIGHTCORE = "nightcore"
+    VAPORWAVE = "vaporwave"
+
+
 @dataclass(slots=True)
 class Track:
     title: str
@@ -46,6 +55,9 @@ class GuildMusicState:
     voice_client: discord.VoiceClient | None = None
     current: Track | None = None
     volume: float = 0.7
+    playback_speed: float = 1.0
+    pitch_semitones: int = 0
+    filter_preset: AudioFilterPreset = AudioFilterPreset.OFF
     repeat_mode: RepeatMode = RepeatMode.OFF
     text_channel_id: int | None = None
     started_at: datetime | None = None
@@ -57,6 +69,11 @@ class GuildMusicState:
     autoplay_enabled: bool = False
     manual_skip: bool = False
     manual_stop: bool = False
+    manual_restart: bool = False
+    restart_position_seconds: int = 0
+    restart_paused: bool = False
+    restart_waiter: asyncio.Future[None] | None = None
+    transition_waiter: asyncio.Future[None] | None = None
     active_panel: MessageRef | None = None
     active_panel_track_id: str | None = None
     track_messages: dict[str, MessageRef] = field(default_factory=dict)

@@ -14,7 +14,7 @@ AISAK es un bot musical para Discord preparado para Hugging Face Spaces con Dock
 - `auto`: SoundCloud primero, YouTube como ultimo fallback.
 - `soundcloud`: fuerza SoundCloud.
 - `mixcloud`: solo enlaces directos en esta version.
-- `youtube`: fuerza YouTube.
+- `youtube`: fuerza YouTube con `yt-dlp + yt-dlp-ejs + bgutil` como ruta dedicada.
 
 ## Lo que incluye
 
@@ -22,7 +22,7 @@ AISAK es un bot musical para Discord preparado para Hugging Face Spaces con Dock
 - Cola por servidor con `play`, `soundcloud`, `mixcloud`, `youtube`, `pause`, `resume`, `skip`, `queue`, `remove`, `clear`, `shuffle`, `repeat`, `volume`, `stop`, `search`, `lyrics` y `help`.
 - Autocomplete en `/play`, `/search`, `/soundcloud` y `/youtube` para elegir la coincidencia correcta antes de enviar el comando.
 - Panel de controles debajo del reproductor con `Pause`, `Skip`, `Stop`, `AutoPlay`, `Dashboard` y `Like`.
-- Reproduccion basada en `yt-dlp + FFmpeg`.
+- Reproduccion basada en `yt-dlp + yt-dlp-ejs + FFmpeg`.
 - Compatibilidad con voz moderna de Discord mediante `discord.py 2.7.x + DAVE`.
 - Resolucion opcional de URLs de Spotify a busquedas reproducibles si configuras `SPOTIFY_CLIENT_ID` y `SPOTIFY_CLIENT_SECRET`.
 - Servidor Flask con `/`, `/health` y `/status` para mantener el Space despierto.
@@ -46,11 +46,13 @@ AISAK es un bot musical para Discord preparado para Hugging Face Spaces con Dock
 
 Variables utiles de reproduccion:
 
-- `YTDLP_YOUTUBE_PLAYER_CLIENTS`: clientes de YouTube preferidos. Recomendado: `web_safari,mweb`
+- `YTDLP_YOUTUBE_PLAYER_CLIENTS`: clientes de YouTube preferidos. Recomendado: `mweb,web_safari`
+- `YTDLP_YOUTUBE_RETRY_PLAYER_CLIENTS`: clientes de reintento si YouTube exige ruta alternativa. Recomendado: `web_safari,mweb`
 - `YTDLP_JS_RUNTIMES`: runtimes JS permitidos para resolver challenges. Recomendado en Spaces: `node`
 - `YTDLP_REMOTE_COMPONENTS`: componentes remotos para `yt-dlp`. Recomendado: `ejs:github`
 - `YTDLP_BGUTIL_BASE_URL`: URL del servidor HTTP del proveedor `bgutil`. Recomendado: `http://127.0.0.1:4416`
 - `YTDLP_BGUTIL_SERVER_HOME`: ruta del proveedor `bgutil` si quieres habilitar tambien su modo script
+- `PLAY_CANDIDATE_LIMIT`: cuantos candidatos probar al arrancar una busqueda por texto antes de elegir la primera pista reproducible. Recomendado: `4`
 
 ## Ejecucion local
 
@@ -101,7 +103,7 @@ Discord exige soporte DAVE/E2EE para participar en canales de voz elegibles desd
 
 ## Nota sobre YouTube en 2026
 
-YouTube puede exigir PO Tokens y resolucion de challenges EJS para exponer formatos de audio. Este proyecto mantiene preparado `bgutil-ytdlp-pot-provider` y deja a YouTube como fallback tecnico cuando SoundCloud no resuelve la busqueda.
+YouTube puede exigir PO Tokens y resolucion de challenges EJS para exponer formatos de audio. Este proyecto mantiene preparada una ruta dedicada con `yt-dlp-ejs` y `bgutil-ytdlp-pot-provider`, usa `mweb` como cliente principal y reintenta con `web_safari` cuando hace falta.
 
 ## UptimeRobot
 

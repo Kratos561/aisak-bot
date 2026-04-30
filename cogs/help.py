@@ -6,11 +6,11 @@ from discord.ext import commands
 
 
 COMMAND_DETAILS = {
-    "play": "Busca por texto, URL o Spotify. En auto prioriza SoundCloud, ofrece autocomplete y deja YouTube como fallback.",
+    "play": "Busca por texto, URL o Spotify. En auto prioriza SoundCloud y, si hace falta, levanta YouTube con EJS + PO tokens.",
     "playlist": "Agrega una playlist a la cola y respeta el orden (ideal para YouTube).",
     "soundcloud": "Fuerza una busqueda o reproduccion usando SoundCloud.",
     "mixcloud": "Acepta solo enlaces directos de Mixcloud en esta version.",
-    "youtube": "Fuerza una busqueda o reproduccion usando YouTube.",
+    "youtube": "Fuerza una busqueda o reproduccion usando YouTube con ruta reforzada para 2026.",
     "pause": "Pausa la reproduccion actual.",
     "resume": "Reanuda la reproduccion pausada.",
     "skip": "Salta una o varias canciones.",
@@ -21,8 +21,12 @@ COMMAND_DETAILS = {
     "shuffle": "Mezcla el orden de las canciones en cola.",
     "repeat": "Cambia el modo de repeticion entre off, one y all.",
     "volume": "Ajusta el volumen de salida del bot.",
+    "speed": "Cambia la velocidad base entre 0.5x y 2.0x y refresca la pista actual si hace falta.",
+    "pitch": "Sube o baja el pitch entre -12 y 12 semitonos.",
+    "filter": "Aplica presets como bassboost, clear, radio, nightcore o vaporwave.",
+    "effectsreset": "Restaura velocidad, pitch y preset al perfil normal.",
     "stop": "Detiene todo y desconecta el bot.",
-    "search": "Busca resultados y te deja elegir uno. En auto muestra primero SoundCloud y luego fallback.",
+    "search": "Busca resultados y te deja elegir uno. En auto mezcla primero SoundCloud y luego YouTube si hace falta.",
     "lyrics": "Intenta obtener la letra de la cancion actual.",
     "help": "Muestra este resumen o el detalle de un comando.",
 }
@@ -67,6 +71,7 @@ class HelpCog(commands.Cog):
                 "- Mientras escribes `/play`, AISAK te sugerira coincidencias.\n"
                 "- Usa `/soundcloud` si quieres fijar esa fuente.\n"
                 "- Usa `/mixcloud` solo con enlaces directos.\n"
+                "- Usa `/speed`, `/pitch`, `/filter` y `/effectsreset` para moldear el audio.\n"
                 "- Usa los botones de Pause, Skip, Stop, AutoPlay, Dashboard y Like debajo del panel."
             ),
             inline=False,

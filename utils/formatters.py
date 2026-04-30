@@ -4,6 +4,7 @@ from math import ceil
 
 import discord
 
+from utils.audio_effects import describe_audio_effects
 from utils.models import GuildMusicState, Track
 from utils.source_router import format_source_label
 
@@ -40,10 +41,26 @@ def build_error_embed(message: str, color: int) -> discord.Embed:
     return discord.Embed(title="Error", description=message, color=discord.Color.red() if color == 0 else color)
 
 
-def build_track_embed(track: Track, heading: str, color: int, voice_channel_name: str | None = None) -> discord.Embed:
+def build_track_embed(
+    track: Track,
+    heading: str,
+    color: int,
+    voice_channel_name: str | None = None,
+    state: GuildMusicState | None = None,
+) -> discord.Embed:
+    description_lines = [f"[{truncate(track.title, 180)}]({track.webpage_url})"]
+    if state is not None and state.current is not None and state.current.id == track.id:
+        elapsed = state.elapsed_seconds()
+        description_lines.append(
+            f"`{format_duration(elapsed)} / {format_duration(track.duration)}` `{progress_bar(elapsed, track.duration)}`"
+        )
+        description_lines.append(
+            f"Vol {int(state.volume * 100)}% · Loop {state.repeat_mode.value} · Auto {'on' if state.autoplay_enabled else 'off'}"
+        )
+
     embed = discord.Embed(
         title=heading,
-        description=f"[{truncate(track.title, 180)}]({track.webpage_url})",
+        description="\n".join(description_lines),
         color=color,
     )
     embed.add_field(name="Duracion", value=format_duration(track.duration), inline=True)
@@ -55,6 +72,8 @@ def build_track_embed(track: Track, heading: str, color: int, voice_channel_name
     embed.add_field(name="Solicitado por", value=requester_value, inline=True)
     if voice_channel_name:
         embed.add_field(name="Conectado en", value=truncate(voice_channel_name, 100), inline=True)
+    if state is not None:
+        embed.add_field(name="Audio", value=describe_audio_effects(state), inline=False)
     if track.thumbnail:
         embed.set_thumbnail(url=track.thumbnail)
     return embed
@@ -81,6 +100,7 @@ def build_now_playing_embed(state: GuildMusicState, color: int) -> discord.Embed
     embed.add_field(name="Autor", value=truncate(track.uploader or "Desconocido", 100), inline=True)
     embed.add_field(name="Volumen", value=f"{int(state.volume * 100)}%", inline=True)
     embed.add_field(name="Loop", value=state.repeat_mode.value, inline=True)
+    embed.add_field(name="Audio", value=describe_audio_effects(state), inline=True)
     embed.add_field(
         name="Conectado en",
         value=truncate(getattr(getattr(state.voice_client, "channel", None), "name", None) or "Desconocido", 100),
@@ -99,6 +119,7 @@ def build_queue_embed(state: GuildMusicState, page: int, color: int) -> discord.
     page = max(page, 1)
     queue_items = list(state.queue)
     total_pages = max(1, ceil(len(queue_items) / per_page))
+    page = min(page, total_pages)
     start = (page - 1) * per_page
     end = start + per_page
 

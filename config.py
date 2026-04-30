@@ -63,13 +63,18 @@ class Settings:
     lyrics_endpoint: str = field(default_factory=lambda: os.getenv("LYRICS_ENDPOINT", "https://api.lyrics.ovh/v1"))
     spotify_playlist_limit: int = field(default_factory=lambda: _get_int("SPOTIFY_PLAYLIST_LIMIT", 20))
     ytdlp_youtube_player_clients: list[str] = field(
-        default_factory=lambda: _get_csv("YTDLP_YOUTUBE_PLAYER_CLIENTS", "web_safari,mweb")
+        default_factory=lambda: _get_csv("YTDLP_YOUTUBE_PLAYER_CLIENTS", "mweb,web_safari")
+    )
+    ytdlp_youtube_retry_player_clients: list[str] = field(
+        default_factory=lambda: _get_csv("YTDLP_YOUTUBE_RETRY_PLAYER_CLIENTS", "web_safari,mweb")
     )
     ytdlp_js_runtimes: list[str] = field(default_factory=lambda: _get_csv("YTDLP_JS_RUNTIMES", "node"))
     ytdlp_remote_components: list[str] = field(default_factory=lambda: _get_csv("YTDLP_REMOTE_COMPONENTS", "ejs:github"))
     ytdlp_bgutil_base_url: str = field(default_factory=lambda: os.getenv("YTDLP_BGUTIL_BASE_URL", "http://127.0.0.1:4416"))
     ytdlp_bgutil_server_home: str | None = field(default_factory=lambda: os.getenv("YTDLP_BGUTIL_SERVER_HOME"))
     ytdlp_search_limit: int = field(default_factory=lambda: _get_int("YTDLP_SEARCH_LIMIT", 5))
+    ytdlp_operation_timeout: int = field(default_factory=lambda: _get_int("YTDLP_OPERATION_TIMEOUT", 35))
+    play_candidate_limit: int = field(default_factory=lambda: _get_int("PLAY_CANDIDATE_LIMIT", 4))
     test_guild_ids: list[int] = field(default_factory=_get_test_guild_ids)
 
     @property

@@ -205,6 +205,8 @@ def log_runtime_versions(bot: AISAKBot) -> None:
         "discord.py": "discord.py",
         "davey": "davey",
         "yt-dlp": "yt-dlp",
+        "yt-dlp-ejs": "yt-dlp-ejs",
+        "bgutil-ytdlp-pot-provider": "bgutil-ytdlp-pot-provider",
     }
     for label, package_name in packages.items():
         try:

@@ -77,6 +77,13 @@ class MusicCog(commands.Cog):
             self.bot.logger.exception("Fallo enviando la respuesta deferida de /play en guild=%s", interaction.guild_id)
             if not self.music.is_playing(interaction.guild_id):
                 raise
+            try:
+                message = await interaction.followup.send(embed=embed, view=view, wait=True)
+            except Exception:
+                self.bot.logger.exception(
+                    "La reproduccion siguio viva, pero tampoco pude mandar el fallback de /play en guild=%s",
+                    interaction.guild_id,
+                )
 
         if len(tracks) == 1 and message is not None:
             try:
@@ -93,6 +100,21 @@ class MusicCog(commands.Cog):
                     "Fallo registrando el panel de /play en guild=%s track=%s",
                     interaction.guild_id,
                     tracks[0].id,
+                )
+        elif message is not None and state.current and state.active_panel is None:
+            try:
+                await self.music.register_track_message(
+                    interaction.guild_id,
+                    state.current,
+                    channel_id=message.channel.id,
+                    message_id=message.id,
+                    activate=True,
+                    heading="Reproduccion iniciada",
+                )
+            except Exception:
+                self.bot.logger.exception(
+                    "La playlist arranco, pero no pude activar un panel reutilizando la respuesta en guild=%s",
+                    interaction.guild_id,
                 )
 
     def _build_single_track_response(self, track: Track, state: GuildMusicState) -> discord.Embed:
@@ -111,6 +133,7 @@ class MusicCog(commands.Cog):
                 "Reproduccion iniciada",
                 self.bot.settings.bot_color,
                 voice_channel_name=getattr(getattr(state.voice_client, "channel", None), "name", None),
+                state=state,
             )
         if queued_this_track:
             return build_track_embed(
@@ -118,6 +141,7 @@ class MusicCog(commands.Cog):
                 "Cancion agregada a la cola",
                 self.bot.settings.bot_color,
                 voice_channel_name=getattr(getattr(state.voice_client, "channel", None), "name", None),
+                state=state,
             )
         return build_success_embed(
             "Solicitud procesada",
@@ -161,21 +185,38 @@ class MusicCog(commands.Cog):
 
     @app_commands.command(name="pause", description="Pausa la reproduccion actual.")
     async def pause(self, interaction: discord.Interaction) -> None:
+        self.music.assert_control_access(interaction)
         track = await self.music.pause(interaction.guild_id)
+        state = self.music.get_state(interaction.guild_id)
         await interaction.response.send_message(
-            embed=build_track_embed(track, "Reproduccion pausada", self.bot.settings.bot_color)
+            embed=build_track_embed(
+                track,
+                "Reproduccion pausada",
+                self.bot.settings.bot_color,
+                voice_channel_name=getattr(getattr(state.voice_client, "channel", None), "name", None),
+                state=state,
+            )
         )
 
     @app_commands.command(name="resume", description="Reanuda la reproduccion pausada.")
     async def resume(self, interaction: discord.Interaction) -> None:
+        self.music.assert_control_access(interaction)
         track = await self.music.resume(interaction.guild_id)
+        state = self.music.get_state(interaction.guild_id)
         await interaction.response.send_message(
-            embed=build_track_embed(track, "Reproduccion reanudada", self.bot.settings.bot_color)
+            embed=build_track_embed(
+                track,
+                "Reproduccion reanudada",
+                self.bot.settings.bot_color,
+                voice_channel_name=getattr(getattr(state.voice_client, "channel", None), "name", None),
+                state=state,
+            )
         )
 
     @app_commands.command(name="skip", description="Salta una o varias canciones.")
     @app_commands.describe(count="Cantidad de canciones a saltar")
     async def skip(self, interaction: discord.Interaction, count: app_commands.Range[int, 1, 25] = 1) -> None:
+        self.music.assert_control_access(interaction)
         skipped = await self.music.skip(interaction.guild_id, validate_skip_count(count))
         description = f"Saltando **{skipped.title}**." if skipped else "Pase a la siguiente cancion."
         await interaction.response.send_message(
@@ -184,6 +225,7 @@ class MusicCog(commands.Cog):
 
     @app_commands.command(name="nowplaying", description="Muestra la cancion actual con su progreso.")
     async def nowplaying(self, interaction: discord.Interaction) -> None:
+        self.music.assert_control_access(interaction)
         state = self.music.get_state(interaction.guild_id)
         await interaction.response.send_message(
             embed=build_now_playing_embed(state, self.bot.settings.bot_color),

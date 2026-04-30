@@ -111,7 +111,7 @@ class AudioService:
     ) -> list[Track]:
         normalized_query = sanitize_query(query)
         if match := SPOTIFY_URL_RE.match(normalized_query):
-            spotify_queries = await asyncio.to_thread(self._resolve_spotify_queries, match)
+            spotify_queries = await self._run_blocking(self._resolve_spotify_queries, match)
             if not spotify_queries:
                 raise PlaybackError("No pude resolver esa URL de Spotify a canciones reproducibles.")
 
@@ -119,7 +119,7 @@ class AudioService:
             spotify_source = source if source in {"soundcloud", "youtube"} else "auto"
             for spotify_query in spotify_queries[:limit]:
                 tracks.extend(
-                    await asyncio.to_thread(
+                    await self._run_blocking(
                         self._resolve_tracks_sync,
                         build_query_plan(spotify_query, spotify_source),
                         requester_name,
@@ -131,7 +131,7 @@ class AudioService:
             return tracks
 
         plan = build_query_plan(normalized_query, source)
-        return await asyncio.to_thread(
+        return await self._run_blocking(
             self._resolve_tracks_sync,
             plan,
             requester_name,
@@ -159,7 +159,7 @@ class AudioService:
     ) -> list[Track]:
         normalized_query = sanitize_query(query)
         plan = build_query_plan(normalized_query, source)
-        return await asyncio.to_thread(
+        return await self._run_blocking(
             self._resolve_tracks_sync,
             plan,
             requester_name,
@@ -172,12 +172,23 @@ class AudioService:
         if track.stream_url:
             return track
         try:
-            return await asyncio.to_thread(self._prepare_stream_sync, track)
+            return await self._run_blocking(self._prepare_stream_sync, track)
         except PlaybackError as exc:
             fallback = await self._prepare_alternative_stream(track, exc)
             if fallback is not None:
                 return fallback
             raise
+
+    async def _run_blocking(self, func: Any, *args: Any) -> Any:
+        try:
+            return await asyncio.wait_for(
+                asyncio.to_thread(func, *args),
+                timeout=max(5, self.settings.ytdlp_operation_timeout),
+            )
+        except TimeoutError as exc:
+            raise PlaybackError(
+                "La fuente tardo demasiado en responder. Intenta otra busqueda o vuelve a probar en unos segundos."
+            ) from exc
 
     def _resolve_tracks_sync(
         self,
@@ -360,11 +371,8 @@ class AudioService:
         return fallback_query
 
     def _prepare_stream_sync(self, track: Track) -> Track:
-        stream_options = self._build_ydl_options(mode="stream", limit=1, source=track.source, direct_url=True)
-
         try:
-            with yt_dlp.YoutubeDL(stream_options) as downloader:
-                info = downloader.extract_info(track.webpage_url, download=False)
+            info = self._extract_stream_info(track.webpage_url, track.source)
         except Exception as exc:  # pragma: no cover - runtime/network path
             raise self._translate_lookup_error(track.source, exc) from exc
 
@@ -382,6 +390,26 @@ class AudioService:
         track.source = self._detect_source(info, track.source)
         return track
 
+    def _extract_stream_info(self, webpage_url: str, source: str) -> dict[str, Any]:
+        stream_options = self._build_ydl_options(mode="stream", limit=1, source=source, direct_url=True)
+        try:
+            with yt_dlp.YoutubeDL(stream_options) as downloader:
+                return downloader.extract_info(webpage_url, download=False)
+        except Exception as exc:
+            translated = self._translate_lookup_error(source, exc)
+            if source != "youtube" or not self._should_retry_youtube_stream_resolution(str(translated)):
+                raise exc
+
+        retry_options = self._build_ydl_options(
+            mode="stream",
+            limit=1,
+            source=source,
+            direct_url=True,
+            youtube_retry=True,
+        )
+        with yt_dlp.YoutubeDL(retry_options) as downloader:
+            return downloader.extract_info(webpage_url, download=False)
+
     def _build_ydl_options(
         self,
         mode: str,
@@ -389,6 +417,7 @@ class AudioService:
         source: str,
         direct_url: bool,
         playlist_like: bool = False,
+        youtube_retry: bool = False,
     ) -> dict[str, Any]:
         options: dict[str, Any] = {
             "quiet": True,
@@ -397,24 +426,35 @@ class AudioService:
             "noplaylist": mode == "stream",
             "socket_timeout": 20,
             "geo_bypass": True,
+            "extractor_retries": 2,
+            "file_access_retries": 2,
         }
 
         if self.proxy_override is not None:
             options["proxy"] = self.proxy_override
 
         if source == "youtube":
+            player_clients = (
+                self.settings.ytdlp_youtube_retry_player_clients
+                if youtube_retry
+                else self.settings.ytdlp_youtube_player_clients
+            )
             extractor_args: dict[str, dict[str, list[str]]] = {
                 "youtube": {
-                    "player_client": self.settings.ytdlp_youtube_player_clients,
+                    "player_client": player_clients,
                 },
                 "youtubepot-bgutilhttp": {
                     "base_url": [self.settings.ytdlp_bgutil_base_url],
                 },
             }
+            if youtube_retry:
+                extractor_args["youtubepot-bgutilhttp"]["disable_innertube"] = ["1"]
             if self.settings.ytdlp_bgutil_server_home:
                 extractor_args["youtubepot-bgutilscript"] = {
                     "server_home": [self.settings.ytdlp_bgutil_server_home],
                 }
+                if youtube_retry:
+                    extractor_args["youtubepot-bgutilscript"]["disable_innertube"] = ["1"]
 
             options.update(
                 {
@@ -472,7 +512,7 @@ class AudioService:
         selected = self._pick_best_format(
             audio_only_formats,
             key=lambda item: (
-                1 if str(item.get("protocol", "")).startswith("http") else 0,
+                self._audio_protocol_rank(item, prefer_hls=self._is_youtube_info(info)),
                 item.get("abr") or 0,
                 item.get("asr") or 0,
                 1 if item.get("acodec") in {"opus", "vorbis"} else 0,
@@ -518,7 +558,7 @@ class AudioService:
             fallback_audio_formats,
             key=lambda item: (
                 1 if item.get("vcodec") == "none" else 0,
-                1 if str(item.get("protocol", "")).startswith("http") else 0,
+                self._audio_protocol_rank(item, prefer_hls=self._is_youtube_info(info)),
                 item.get("abr") or 0,
                 item.get("asr") or 0,
                 1 if item.get("acodec") in {"opus", "vorbis"} else 0,
@@ -628,6 +668,16 @@ class AudioService:
         protocol = str(format_info.get("protocol") or "").lower()
         return protocol == "http_dash_segments"
 
+    def _audio_protocol_rank(self, format_info: dict[str, Any], *, prefer_hls: bool) -> int:
+        protocol = str(format_info.get("protocol") or "").lower()
+        if prefer_hls and protocol in {"m3u8", "m3u8_native"}:
+            return 3
+        if protocol.startswith(("https", "http")):
+            return 2
+        if protocol.startswith(("m3u8", "hls")):
+            return 1
+        return 0
+
     def _normalize_headers(self, headers: dict[str, Any] | None) -> dict[str, str]:
         if not headers:
             return {}
@@ -705,6 +755,15 @@ class AudioService:
             "youtube bloqueo temporalmente" in lowered
             or "youtube no permite esa pista" in lowered
             or "youtube no entrego un stream reproducible" in lowered
+            or "no pude obtener el audio" in lowered
+        )
+
+    def _should_retry_youtube_stream_resolution(self, message: str) -> bool:
+        lowered = message.lower()
+        return (
+            "youtube bloqueo temporalmente" in lowered
+            or "no entrego un stream reproducible" in lowered
+            or "no pudo resolver esa solicitud" in lowered
             or "no pude obtener el audio" in lowered
         )
 
