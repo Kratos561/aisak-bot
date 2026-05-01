@@ -11,14 +11,7 @@ import yt_dlp
 from config import Settings
 from utils.errors import ConfigurationError, PlaybackError, UserInputError
 from utils.models import Track
-from utils.source_router import (
-    MIXCLOUD_URL_RE,
-    SOUNDCLOUD_URL_RE,
-    YOUTUBE_URL_RE,
-    QueryPlan,
-    build_query_plan,
-    format_source_label,
-)
+from utils.source_router import YOUTUBE_URL_RE, QueryPlan, build_query_plan, format_source_label
 from utils.validators import is_url, sanitize_query
 
 try:
@@ -440,14 +433,10 @@ class AudioService:
                     "base_url": [self.settings.ytdlp_bgutil_base_url],
                 },
             }
-            if youtube_retry:
-                extractor_args["youtubepot-bgutilhttp"]["disable_innertube"] = ["1"]
             if self.settings.ytdlp_bgutil_server_home:
                 extractor_args["youtubepot-bgutilscript"] = {
                     "server_home": [self.settings.ytdlp_bgutil_server_home],
                 }
-                if youtube_retry:
-                    extractor_args["youtubepot-bgutilscript"]["disable_innertube"] = ["1"]
 
             options.update(
                 {
@@ -484,8 +473,6 @@ class AudioService:
     def _build_target(self, query: str, source: str, limit: int) -> str:
         if is_url(query):
             return query
-        if source == "soundcloud":
-            return f"scsearch{max(1, limit)}:{query}"
         if source == "youtube":
             return f"ytsearch{max(1, limit)}:{query}"
         raise PlaybackError(f"{format_source_label(source)} no soporta busqueda por texto en esta version.")
@@ -576,12 +563,6 @@ class AudioService:
             return PlaybackError("YouTube no permite esa pista porque esta privada o ya no esta disponible.")
         if source == "youtube" and "Sign in to confirm you" in message:
             return PlaybackError("YouTube bloqueo temporalmente esta pista.")
-        if source == "soundcloud" and ("Unauthorized" in message or "401" in message):
-            return PlaybackError("SoundCloud rechazo la solicitud para esa pista.")
-        if source == "mixcloud" and "Track unavailable in your country" in message:
-            return PlaybackError("Mixcloud no permite reproducir esa pista en esta region.")
-        if source == "mixcloud" and "Track not found" in message:
-            return PlaybackError("No pude abrir ese enlace de Mixcloud.")
         if "No formats" in message or "Requested format is not available" in message:
             return PlaybackError(f"{source_label} no entrego un stream reproducible.")
 
@@ -632,10 +613,6 @@ class AudioService:
 
         if requested_source == "youtube" or "youtube" in extractor or YOUTUBE_URL_RE.match(webpage_url):
             return "youtube"
-        if requested_source == "soundcloud" or "soundcloud" in extractor or SOUNDCLOUD_URL_RE.match(webpage_url):
-            return "soundcloud"
-        if requested_source == "mixcloud" or "mixcloud" in extractor or MIXCLOUD_URL_RE.match(webpage_url):
-            return "mixcloud"
         if "spotify" in extractor or "spotify" in webpage_url:
             return "spotify"
         if requested_source != "auto":

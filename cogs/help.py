@@ -8,8 +8,6 @@ from discord.ext import commands
 COMMAND_DETAILS = {
     "play": "Busca por texto, URL de YouTube o Spotify y reproduce usando YouTube como unica fuente.",
     "playlist": "Agrega una playlist a la cola y respeta el orden (ideal para YouTube).",
-    "soundcloud": "Alias de compatibilidad: ahora busca en YouTube.",
-    "mixcloud": "Alias de compatibilidad: ahora solo acepta busquedas o enlaces de YouTube.",
     "youtube": "Fuerza una busqueda o reproduccion usando YouTube con ruta reforzada para 2026.",
     "pause": "Pausa la reproduccion actual.",
     "resume": "Reanuda la reproduccion pausada.",

@@ -794,28 +794,12 @@ async def main() -> None:
             settle_seconds=0.05,
         )
     await add_case(
-            "soundcloud_alias_uses_youtube",
-            MusicCog,
-            "soundcloud",
-            "ACIDO III",
-            probe_only_playback=True,
-            settle_seconds=0.1,
-        )
-    await add_case(
             "play_register_panel_failure_keeps_response",
             MusicCog,
             "play",
             "ACIDO III",
             auto_choice,
             fail_register_track_message=True,
-        )
-    await add_case(
-            "mixcloud_alias_uses_youtube",
-            MusicCog,
-            "mixcloud",
-            "ACIDO III",
-            probe_only_playback=True,
-            settle_seconds=0.1,
         )
     await add_case(
             "youtube_play_kimetsu_kizuna_exact",

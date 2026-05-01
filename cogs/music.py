@@ -150,24 +150,6 @@ class MusicCog(commands.Cog):
             self.bot.settings.bot_color,
         )
 
-    @app_commands.command(name="soundcloud", description="Compatibilidad: ahora busca y reproduce desde YouTube.")
-    @app_commands.describe(query="Nombre de la cancion o URL de YouTube")
-    async def soundcloud(self, interaction: discord.Interaction, query: str) -> None:
-        await self._play_impl(interaction, query, "youtube")
-
-    @soundcloud.autocomplete("query")
-    async def soundcloud_autocomplete(
-        self,
-        interaction: discord.Interaction,
-        current: str,
-    ) -> list[app_commands.Choice[str]]:
-        return await self._autocomplete_query(interaction, current, forced_source="youtube")
-
-    @app_commands.command(name="mixcloud", description="Compatibilidad: ahora solo acepta busquedas o enlaces de YouTube.")
-    @app_commands.describe(url="Nombre de la cancion o URL de YouTube")
-    async def mixcloud(self, interaction: discord.Interaction, url: str) -> None:
-        await self._play_impl(interaction, url, "youtube")
-
     @app_commands.command(name="youtube", description="Busca y reproduce usando YouTube como fuente principal.")
     @app_commands.describe(query="Nombre de la cancion o URL de YouTube")
     async def youtube(self, interaction: discord.Interaction, query: str) -> None:

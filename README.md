@@ -13,13 +13,12 @@ AISAK es un bot musical para Discord preparado para Hugging Face Spaces con Dock
 
 - `auto`: resuelve en YouTube.
 - `youtube`: fuerza YouTube con `yt-dlp + yt-dlp-ejs + bgutil` como ruta dedicada.
-- `soundcloud` y `mixcloud`: quedan como aliases de compatibilidad, pero no reproducen desde esas fuentes.
 
 ## Lo que incluye
 
 - Slash commands con `discord.py`.
 - Cola por servidor con `play`, `playlist`, `youtube`, `pause`, `resume`, `skip`, `queue`, `remove`, `clear`, `shuffle`, `repeat`, `volume`, `stop`, `search`, `lyrics` y `help`.
-- Autocomplete en `/play`, `/search`, `/soundcloud` y `/youtube` para elegir la coincidencia correcta antes de enviar el comando.
+- Autocomplete en `/play`, `/search` y `/youtube` para elegir la coincidencia correcta antes de enviar el comando.
 - Panel de controles debajo del reproductor con `Pause`, `Skip`, `Stop`, `AutoPlay`, `Dashboard` y `Like`.
 - Reproduccion basada en YouTube con `yt-dlp + yt-dlp-ejs + bgutil + FFmpeg`.
 - Compatibilidad con voz moderna de Discord mediante `discord.py 2.7.x + DAVE`.
