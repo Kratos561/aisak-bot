@@ -34,25 +34,16 @@ async def build_query_choices(
         return []
 
     try:
-        if source == "auto":
-            tracks = await _search_auto_choices(
-                audio_service,
-                normalized,
-                requester_name,
-                requester_id,
-                limit,
-            )
-        else:
-            tracks = await asyncio.wait_for(
-                audio_service.search_tracks(
-                    query=normalized,
-                    requester_name=requester_name,
-                    requester_id=requester_id,
-                    limit=limit,
-                    source=source,
-                ),
-                timeout=2.8,
-            )
+        tracks = await asyncio.wait_for(
+            audio_service.search_tracks(
+                query=normalized,
+                requester_name=requester_name,
+                requester_id=requester_id,
+                limit=limit,
+                source="youtube" if source == "auto" else source,
+            ),
+            timeout=2.8,
+        )
     except Exception:
         return []
 
@@ -72,35 +63,3 @@ async def build_query_choices(
         if len(choices) >= limit:
             break
     return choices
-
-
-async def _search_auto_choices(
-    audio_service,
-    normalized: str,
-    requester_name: str,
-    requester_id: int,
-    limit: int,
-):
-    async def run_source(source_name: str):
-        try:
-            return await audio_service.search_tracks(
-                query=normalized,
-                requester_name=requester_name,
-                requester_id=requester_id,
-                limit=limit,
-                source=source_name,
-            )
-        except Exception:
-            return []
-
-    soundcloud_task = asyncio.create_task(run_source("soundcloud"))
-    youtube_task = asyncio.create_task(run_source("youtube"))
-    done, pending = await asyncio.wait({soundcloud_task, youtube_task}, timeout=2.6)
-
-    for task in pending:
-        task.cancel()
-
-    results_by_task = {task: task.result() for task in done if not task.cancelled()}
-    soundcloud_tracks = results_by_task.get(soundcloud_task, [])
-    youtube_tracks = results_by_task.get(youtube_task, [])
-    return (soundcloud_tracks + youtube_tracks)[:limit]

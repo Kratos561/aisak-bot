@@ -6,10 +6,10 @@ from discord.ext import commands
 
 
 COMMAND_DETAILS = {
-    "play": "Busca por texto, URL o Spotify. En auto prioriza SoundCloud y, si hace falta, levanta YouTube con EJS + PO tokens.",
+    "play": "Busca por texto, URL de YouTube o Spotify y reproduce usando YouTube como unica fuente.",
     "playlist": "Agrega una playlist a la cola y respeta el orden (ideal para YouTube).",
-    "soundcloud": "Fuerza una busqueda o reproduccion usando SoundCloud.",
-    "mixcloud": "Acepta solo enlaces directos de Mixcloud en esta version.",
+    "soundcloud": "Alias de compatibilidad: ahora busca en YouTube.",
+    "mixcloud": "Alias de compatibilidad: ahora solo acepta busquedas o enlaces de YouTube.",
     "youtube": "Fuerza una busqueda o reproduccion usando YouTube con ruta reforzada para 2026.",
     "pause": "Pausa la reproduccion actual.",
     "resume": "Reanuda la reproduccion pausada.",
@@ -26,7 +26,7 @@ COMMAND_DETAILS = {
     "filter": "Aplica presets como bassboost, clear, radio, nightcore o vaporwave.",
     "effectsreset": "Restaura velocidad, pitch y preset al perfil normal.",
     "stop": "Detiene todo y desconecta el bot.",
-    "search": "Busca resultados y te deja elegir uno. En auto mezcla primero SoundCloud y luego YouTube si hace falta.",
+    "search": "Busca resultados en YouTube y te deja elegir uno.",
     "lyrics": "Intenta obtener la letra de la cancion actual.",
     "help": "Muestra este resumen o el detalle de un comando.",
 }
@@ -69,8 +69,8 @@ class HelpCog(commands.Cog):
             value=(
                 "- Usa `/play` con texto o enlaces.\n"
                 "- Mientras escribes `/play`, AISAK te sugerira coincidencias.\n"
-                "- Usa `/soundcloud` si quieres fijar esa fuente.\n"
-                "- Usa `/mixcloud` solo con enlaces directos.\n"
+                "- AISAK reproduce desde YouTube como fuente unica.\n"
+                "- Usa `/playlist` con enlaces de playlist de YouTube.\n"
                 "- Usa `/speed`, `/pitch`, `/filter` y `/effectsreset` para moldear el audio.\n"
                 "- Usa los botones de Pause, Skip, Stop, AutoPlay, Dashboard y Like debajo del panel."
             ),

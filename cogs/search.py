@@ -15,8 +15,6 @@ from utils.source_router import format_source_label
 
 SOURCE_CHOICES = [
     app_commands.Choice(name="auto", value="auto"),
-    app_commands.Choice(name="soundcloud", value="soundcloud"),
-    app_commands.Choice(name="mixcloud", value="mixcloud"),
     app_commands.Choice(name="youtube", value="youtube"),
 ]
 
@@ -63,8 +61,8 @@ class SearchCog(commands.Cog):
         self.bot = bot
         self.music = bot.music
 
-    @app_commands.command(name="search", description="Busca canciones y deja elegir entre los mejores resultados.")
-    @app_commands.describe(query="Termino de busqueda", source="Fuente preferida")
+    @app_commands.command(name="search", description="Busca canciones en YouTube y deja elegir entre resultados.")
+    @app_commands.describe(query="Termino de busqueda", source="Fuente")
     @app_commands.choices(source=SOURCE_CHOICES)
     async def search(
         self,

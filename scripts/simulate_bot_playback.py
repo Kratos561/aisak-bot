@@ -443,13 +443,13 @@ async def run_case(
 
         def _simulated_youtube_track(query: str, requester_name: str, requester_id: int, source: str) -> Track:
             return Track(
-                title=f"YouTube Simulated - {query}",
+                title=query,
                 webpage_url=f"https://www.youtube.com/watch?v=sim-{abs(hash(query))}",
                 stream_url=str(sample_audio_path),
                 duration=180,
                 uploader="YouTube",
                 thumbnail="https://i.ytimg.com/vi/simulated/hqdefault.jpg",
-                source="youtube" if source in {"youtube", "auto"} else source,
+                source="youtube",
                 requester_id=requester_id,
                 requester_name=requester_name,
                 search_query=query,
@@ -462,7 +462,7 @@ async def run_case(
             limit: int = 1,
             source: str = "auto",
         ) -> list[Track]:
-            if source == "youtube":
+            if source in {"youtube", "auto"}:
                 return [_simulated_youtube_track(query, requester_name, requester_id, source)]
             return await original_fetch_tracks(query, requester_name, requester_id, limit, source)
 
@@ -473,7 +473,7 @@ async def run_case(
             limit: int = 5,
             source: str = "auto",
         ) -> list[Track]:
-            if source == "youtube":
+            if source in {"youtube", "auto"}:
                 return [
                     _simulated_youtube_track(f"{query} result {index}", requester_name, requester_id, source)
                     for index in range(1, min(limit, 5) + 1)
@@ -747,9 +747,10 @@ async def run_audio_controls_case(
 
 
 async def main() -> None:
-    soundcloud_choice = app_commands.Choice(name="auto", value="auto")
+    auto_choice = app_commands.Choice(name="auto", value="auto")
     nightcore_choice = app_commands.Choice(name="nightcore", value="nightcore")
     youtube_choice = app_commands.Choice(name="youtube", value="youtube")
+    kimetsu_query = "Kimetsu no Yaiba Season 3 OP. Full | Kizuna no Kiseki - Sub. Español 『AMV』♡"
     playlist_url = "https://youtube.com/playlist?list=PL_ZVTvNsmBNYtGwPsmJ6xy1BvPCjSkYux&si=Yqmgi55edRY5oEm9"
     selected_cases = set(sys.argv[1:])
     results: list[dict[str, Any]] = []
@@ -770,7 +771,7 @@ async def main() -> None:
             SearchCog,
             "search",
             "ACIDO III",
-            soundcloud_choice,
+            auto_choice,
             settle_seconds=0.1,
         )
     await add_case(
@@ -778,7 +779,7 @@ async def main() -> None:
             MusicCog,
             "play",
             "ACIDO III",
-            soundcloud_choice,
+            auto_choice,
             probe_only_playback=True,
             settle_seconds=0.1,
         )
@@ -787,17 +788,16 @@ async def main() -> None:
             MusicCog,
             "play",
             "ACIDO III",
-            soundcloud_choice,
+            auto_choice,
             stub_single_track_playback=True,
             fail_register_track_message=True,
             settle_seconds=0.05,
         )
     await add_case(
-            "play_soundcloud_url_acido_iii",
+            "soundcloud_alias_uses_youtube",
             MusicCog,
-            "play",
-            "https://soundcloud.com/goodcookie-002/acido-iii-1",
-            app_commands.Choice(name="soundcloud", value="soundcloud"),
+            "soundcloud",
+            "ACIDO III",
             probe_only_playback=True,
             settle_seconds=0.1,
         )
@@ -806,14 +806,22 @@ async def main() -> None:
             MusicCog,
             "play",
             "ACIDO III",
-            soundcloud_choice,
+            auto_choice,
             fail_register_track_message=True,
         )
     await add_case(
-            "play_mixcloud_direct_url",
+            "mixcloud_alias_uses_youtube",
             MusicCog,
             "mixcloud",
-            "https://www.mixcloud.com/dholbach/cryptkeeper/",
+            "ACIDO III",
+            probe_only_playback=True,
+            settle_seconds=0.1,
+        )
+    await add_case(
+            "youtube_play_kimetsu_kizuna_exact",
+            MusicCog,
+            "youtube",
+            kimetsu_query,
             probe_only_playback=True,
             settle_seconds=0.1,
         )

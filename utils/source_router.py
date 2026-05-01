@@ -27,7 +27,7 @@ RARE_QUERY_TERMS = (
 )
 
 SOURCE_LABELS = {
-    "auto": "Auto",
+    "auto": "YouTube",
     "youtube": "YouTube",
     "soundcloud": "SoundCloud",
     "mixcloud": "Mixcloud",
@@ -93,28 +93,19 @@ def build_query_plan(query: str, requested_source: str) -> QueryPlan:
     kind = classify_query(query)
     intent = infer_query_intent(query)
 
-    if requested_source == "mixcloud":
-        if detected_source != "mixcloud":
-            raise UserInputError("Mixcloud solo acepta enlaces directos en esta version. Usa `/mixcloud` con un enlace de Mixcloud.")
-        return QueryPlan(query, requested_source, kind, detected_source, intent, ["mixcloud"], ["mixcloud"])
+    if requested_source in {"soundcloud", "mixcloud"}:
+        raise UserInputError("AISAK ahora usa solo YouTube. Usa `/youtube`, `/play` o un enlace de YouTube.")
 
-    if requested_source in {"soundcloud", "youtube"}:
-        if detected_source and detected_source != requested_source:
-            label = format_source_label(requested_source)
-            raise UserInputError(f"Ese enlace no pertenece a {label}.")
-        return QueryPlan(query, requested_source, kind, detected_source, intent, [requested_source], [requested_source])
-
-    if requested_source != "auto":
+    if requested_source not in {"auto", "youtube"}:
         raise UserInputError(f"La fuente `{requested_source}` no esta soportada.")
 
-    if detected_source == "mixcloud":
-        return QueryPlan(query, requested_source, kind, detected_source, intent, ["mixcloud"], ["mixcloud"])
-    if detected_source == "soundcloud":
-        return QueryPlan(query, requested_source, kind, detected_source, intent, ["soundcloud"], ["soundcloud"])
     if detected_source == "youtube":
         return QueryPlan(query, requested_source, kind, detected_source, intent, ["youtube"], ["youtube"])
-    if kind == QueryKind.URL_OTHER:
-        return QueryPlan(query, requested_source, kind, detected_source, intent, ["youtube"], ["youtube"])
 
-    # In auto mode we optimize for rare tracks, mixes, edits, and covers.
-    return QueryPlan(query, requested_source, kind, detected_source, intent, ["soundcloud", "youtube"], ["soundcloud", "youtube"])
+    if detected_source in {"soundcloud", "mixcloud"}:
+        raise UserInputError("Ese enlace no es de YouTube. AISAK ahora reproduce solamente desde YouTube.")
+
+    if kind == QueryKind.URL_OTHER:
+        raise UserInputError("Ese enlace no pertenece a YouTube. Usa un enlace de YouTube o busca por nombre.")
+
+    return QueryPlan(query, requested_source, kind, detected_source, intent, ["youtube"], ["youtube"])

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-import difflib
 import logging
 import os
 import re
@@ -116,7 +115,7 @@ class AudioService:
                 raise PlaybackError("No pude resolver esa URL de Spotify a canciones reproducibles.")
 
             tracks: list[Track] = []
-            spotify_source = source if source in {"soundcloud", "youtube"} else "auto"
+            spotify_source = "youtube"
             for spotify_query in spotify_queries[:limit]:
                 tracks.extend(
                     await self._run_blocking(
@@ -171,13 +170,7 @@ class AudioService:
     async def prepare_stream(self, track: Track) -> Track:
         if track.stream_url:
             return track
-        try:
-            return await self._run_blocking(self._prepare_stream_sync, track)
-        except PlaybackError as exc:
-            fallback = await self._prepare_alternative_stream(track, exc)
-            if fallback is not None:
-                return fallback
-            raise
+        return await self._run_blocking(self._prepare_stream_sync, track)
 
     async def _run_blocking(self, func: Any, *args: Any) -> Any:
         try:
@@ -705,59 +698,6 @@ class AudioService:
 
         return False
 
-    async def _prepare_alternative_stream(self, track: Track, error: PlaybackError) -> Track | None:
-        if track.source != "youtube":
-            return None
-        if not self._should_try_alternative_source(str(error)):
-            return None
-
-        requester_name = track.requester_name or "Fallback"
-        requester_id = track.requester_id or 0
-
-        for query in self._build_alternative_queries(track):
-            try:
-                candidates = await self.search_tracks(
-                    query=query,
-                    requester_name=requester_name,
-                    requester_id=requester_id,
-                    limit=3,
-                    source="soundcloud",
-                )
-            except PlaybackError:
-                continue
-
-            for candidate in candidates:
-                if candidate.webpage_url == track.webpage_url:
-                    continue
-                if self._fallback_match_score(track.title, candidate.title) < 0.5:
-                    continue
-                candidate.requester_name = requester_name
-                candidate.requester_id = requester_id
-                candidate.search_query = track.search_query or query
-                try:
-                    prepared = await asyncio.to_thread(self._prepare_stream_sync, candidate)
-                except PlaybackError:
-                    continue
-
-                self.logger.info(
-                    "Fallback de YouTube a SoundCloud para '%s' usando query '%s' -> '%s'",
-                    track.title,
-                    query,
-                    prepared.title,
-                )
-                return prepared
-
-        return None
-
-    def _should_try_alternative_source(self, message: str) -> bool:
-        lowered = message.lower()
-        return (
-            "youtube bloqueo temporalmente" in lowered
-            or "youtube no permite esa pista" in lowered
-            or "youtube no entrego un stream reproducible" in lowered
-            or "no pude obtener el audio" in lowered
-        )
-
     def _should_retry_youtube_stream_resolution(self, message: str) -> bool:
         lowered = message.lower()
         return (
@@ -766,56 +706,3 @@ class AudioService:
             or "no pudo resolver esa solicitud" in lowered
             or "no pude obtener el audio" in lowered
         )
-
-    def _build_alternative_queries(self, track: Track) -> list[str]:
-        candidates: list[str] = []
-
-        def add(value: str | None) -> None:
-            if not value:
-                return
-            cleaned = self._clean_fallback_query(value)
-            if len(cleaned) < 3:
-                return
-            if cleaned not in candidates:
-                candidates.append(cleaned)
-
-        title = track.title or ""
-        add(title)
-        add(BRACKETED_SEGMENT_RE.sub(" ", title))
-
-        title_without_brackets = BRACKETED_SEGMENT_RE.sub(" ", title)
-        split_hyphen = [part.strip() for part in re.split(r"\s+-\s+|-", title_without_brackets) if part.strip()]
-        if split_hyphen:
-            add(split_hyphen[0])
-            add(" ".join(split_hyphen[:2]))
-
-        if track.uploader:
-            add(f"{track.uploader} {title_without_brackets}")
-
-        if track.search_query and not is_url(track.search_query):
-            add(track.search_query)
-
-        return candidates
-
-    def _clean_fallback_query(self, value: str) -> str:
-        cleaned = BRACKETED_SEGMENT_RE.sub(" ", value)
-        cleaned = NON_WORD_QUERY_RE.sub(" ", cleaned)
-        return " ".join(cleaned.split())
-
-    def _fallback_match_score(self, original: str, candidate: str) -> float:
-        original_tokens = self._match_tokens(original)
-        candidate_tokens = self._match_tokens(candidate)
-        if not original_tokens or not candidate_tokens:
-            return 0.0
-
-        overlap = len(set(original_tokens) & set(candidate_tokens)) / max(len(set(original_tokens)), 1)
-        sequence = difflib.SequenceMatcher(
-            None,
-            " ".join(original_tokens),
-            " ".join(candidate_tokens),
-        ).ratio()
-        return (overlap * 0.7) + (sequence * 0.3)
-
-    def _match_tokens(self, value: str) -> list[str]:
-        cleaned = self._clean_fallback_query(value).lower()
-        return [token for token in cleaned.split() if token and token not in FALLBACK_STOP_TOKENS]

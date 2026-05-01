@@ -9,32 +9,31 @@ app_port: 7860
 
 # AISAK
 
-AISAK es un bot musical para Discord preparado para Hugging Face Spaces con Docker. Mantiene un endpoint HTTP para health checks, gestiona colas por servidor y usa una estrategia hibrida de fuentes:
+AISAK es un bot musical para Discord preparado para Hugging Face Spaces con Docker. Mantiene un endpoint HTTP para health checks, gestiona colas por servidor y usa YouTube como fuente unica de reproduccion:
 
-- `auto`: SoundCloud primero, YouTube como ultimo fallback.
-- `soundcloud`: fuerza SoundCloud.
-- `mixcloud`: solo enlaces directos en esta version.
+- `auto`: resuelve en YouTube.
 - `youtube`: fuerza YouTube con `yt-dlp + yt-dlp-ejs + bgutil` como ruta dedicada.
+- `soundcloud` y `mixcloud`: quedan como aliases de compatibilidad, pero no reproducen desde esas fuentes.
 
 ## Lo que incluye
 
 - Slash commands con `discord.py`.
-- Cola por servidor con `play`, `soundcloud`, `mixcloud`, `youtube`, `pause`, `resume`, `skip`, `queue`, `remove`, `clear`, `shuffle`, `repeat`, `volume`, `stop`, `search`, `lyrics` y `help`.
+- Cola por servidor con `play`, `playlist`, `youtube`, `pause`, `resume`, `skip`, `queue`, `remove`, `clear`, `shuffle`, `repeat`, `volume`, `stop`, `search`, `lyrics` y `help`.
 - Autocomplete en `/play`, `/search`, `/soundcloud` y `/youtube` para elegir la coincidencia correcta antes de enviar el comando.
 - Panel de controles debajo del reproductor con `Pause`, `Skip`, `Stop`, `AutoPlay`, `Dashboard` y `Like`.
-- Reproduccion basada en `yt-dlp + yt-dlp-ejs + FFmpeg`.
+- Reproduccion basada en YouTube con `yt-dlp + yt-dlp-ejs + bgutil + FFmpeg`.
 - Compatibilidad con voz moderna de Discord mediante `discord.py 2.7.x + DAVE`.
 - Resolucion opcional de URLs de Spotify a busquedas reproducibles si configuras `SPOTIFY_CLIENT_ID` y `SPOTIFY_CLIENT_SECRET`.
 - Servidor Flask con `/`, `/health` y `/status` para mantener el Space despierto.
 - Dockerfile compatible con Hugging Face Spaces.
 - Script para crear o actualizar el monitor de UptimeRobot desde API.
 
-## Estrategia de fuentes
+## Estrategia de fuente
 
-- `auto` prioriza SoundCloud para busquedas abiertas, rarezas, mixes, edits, covers y variantes.
-- Mixcloud entra solo por URL directa.
-- YouTube se conserva como fallback tecnico, no como fuente principal.
-- Si una fuente falla, el bot informa el motivo y no anuncia reproduccion iniciada si la pista no arranco de verdad.
+- YouTube es la unica fuente oficial de reproduccion.
+- `auto` y `/play` resuelven en YouTube.
+- Los enlaces que no sean de YouTube se rechazan con un error guiado.
+- Si YouTube falla, el bot informa el motivo y no cambia silenciosamente a otra fuente.
 - El mensaje de reproduccion trae botones para controlar la cancion sin escribir otro comando.
 
 ## Variables necesarias
