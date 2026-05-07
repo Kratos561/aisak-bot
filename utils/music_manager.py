@@ -236,6 +236,12 @@ class MusicManager:
                     return prepared_track
                 except Exception as exc:  # pragma: no cover - runtime/network path
                     self.logger.exception("Fallo preparando el audio para %s", next_track.title)
+                    recovered_track = await self._recover_blocked_youtube_candidate(state, next_track, exc)
+                    if recovered_track is not None:
+                        state.queue.appendleft(recovered_track)
+                        resume_offset = 0
+                        panel_heading = "Reproduccion iniciada"
+                        continue
                     await self._notify_text_channel(
                         state,
                         self._format_playback_failure_message(next_track, exc),
@@ -725,6 +731,65 @@ class MusicManager:
         if last_error is not None:
             raise last_error
         raise PlaybackError("No encontre una pista reproducible entre los resultados.")
+
+    async def _recover_blocked_youtube_candidate(
+        self,
+        state: GuildMusicState,
+        failed_track: Track,
+        error: Exception,
+    ) -> Track | None:
+        if failed_track.source != "youtube":
+            return None
+
+        query = failed_track.search_query or failed_track.title
+        if not query or is_url(query):
+            query = self._build_autoplay_query(failed_track)
+
+        requester_name = failed_track.requester_name or "YouTube Recovery"
+        requester_id = failed_track.requester_id or (self.bot.user.id if self.bot.user else 0)
+        try:
+            candidates = await self.audio_service.search_tracks(
+                query=query,
+                requester_name=requester_name,
+                requester_id=requester_id,
+                limit=max(3, self.settings.play_candidate_limit),
+                source="youtube",
+            )
+        except Exception:
+            self.logger.exception("No pude buscar candidatos alternos de YouTube para %s", failed_track.title)
+            return None
+
+        skipped_urls = {failed_track.webpage_url}
+        skipped_urls.update(track.webpage_url for track in state.history)
+        skipped_urls.update(track.webpage_url for track in state.queue)
+        last_error: Exception | None = error
+
+        for candidate in candidates:
+            if candidate.webpage_url in skipped_urls:
+                continue
+            candidate.requester_name = requester_name
+            candidate.requester_id = requester_id
+            candidate.search_query = query
+            try:
+                prepared = await self.audio_service.prepare_stream(candidate)
+            except PlaybackError as exc:
+                last_error = exc
+                self.logger.info(
+                    "Candidato alterno de YouTube descartado: %s (%s)",
+                    candidate.title,
+                    exc,
+                )
+                continue
+
+            self.logger.info(
+                "Recuperacion YouTube: '%s' fallo (%s), usando '%s'",
+                failed_track.title,
+                last_error,
+                prepared.title,
+            )
+            return prepared
+
+        return None
 
     async def register_track_message(
         self,

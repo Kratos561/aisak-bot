@@ -42,6 +42,6 @@ COPY --chown=user . .
 EXPOSE 7860
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-  CMD curl -fsS http://127.0.0.1:7860/health || exit 1
+  CMD sh -c 'curl -fsS "http://127.0.0.1:${PORT:-7860}/health" || exit 1'
 
 CMD ["bash", "-lc", "node \"$HOME/bgutil-ytdlp-pot-provider/server/build/main.js\" & for i in $(seq 1 30); do curl -fsS http://127.0.0.1:4416/ping >/dev/null 2>&1 && break; sleep 1; done; exec python main.py"]

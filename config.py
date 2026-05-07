@@ -68,13 +68,24 @@ class Settings:
     ytdlp_youtube_retry_player_clients: list[str] = field(
         default_factory=lambda: _get_csv("YTDLP_YOUTUBE_RETRY_PLAYER_CLIENTS", "web_safari,mweb,web_embedded")
     )
+    ytdlp_youtube_stream_routes: list[str] = field(
+        default_factory=lambda: _get_csv(
+            "YTDLP_YOUTUBE_STREAM_ROUTES",
+            "web_safari,mweb,mweb+web_safari,web_embedded,tv_simply,ios,android,android_vr",
+        )
+    )
+    ytdlp_youtube_po_tokens: list[str] = field(default_factory=lambda: _get_csv("YTDLP_YOUTUBE_PO_TOKENS", ""))
+    ytdlp_youtube_visitor_data: str | None = field(default_factory=lambda: os.getenv("YTDLP_YOUTUBE_VISITOR_DATA"))
+    ytdlp_youtube_cookies_path: str | None = field(default_factory=lambda: os.getenv("YTDLP_YOUTUBE_COOKIES_PATH"))
+    ytdlp_youtube_cookies_text: str | None = field(default_factory=lambda: os.getenv("YTDLP_YOUTUBE_COOKIES_TEXT"))
+    ytdlp_youtube_cookies_b64: str | None = field(default_factory=lambda: os.getenv("YTDLP_YOUTUBE_COOKIES_B64"))
     ytdlp_js_runtimes: list[str] = field(default_factory=lambda: _get_csv("YTDLP_JS_RUNTIMES", "node"))
     ytdlp_remote_components: list[str] = field(default_factory=lambda: _get_csv("YTDLP_REMOTE_COMPONENTS", "ejs:github"))
     ytdlp_bgutil_base_url: str = field(default_factory=lambda: os.getenv("YTDLP_BGUTIL_BASE_URL", "http://127.0.0.1:4416"))
     ytdlp_bgutil_server_home: str | None = field(default_factory=lambda: os.getenv("YTDLP_BGUTIL_SERVER_HOME"))
     ytdlp_search_limit: int = field(default_factory=lambda: _get_int("YTDLP_SEARCH_LIMIT", 5))
-    ytdlp_operation_timeout: int = field(default_factory=lambda: _get_int("YTDLP_OPERATION_TIMEOUT", 35))
-    play_candidate_limit: int = field(default_factory=lambda: _get_int("PLAY_CANDIDATE_LIMIT", 8))
+    ytdlp_operation_timeout: int = field(default_factory=lambda: _get_int("YTDLP_OPERATION_TIMEOUT", 25))
+    play_candidate_limit: int = field(default_factory=lambda: _get_int("PLAY_CANDIDATE_LIMIT", 6))
     test_guild_ids: list[int] = field(default_factory=_get_test_guild_ids)
 
     @property

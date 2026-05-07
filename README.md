@@ -46,11 +46,17 @@ Variables utiles de reproduccion:
 
 - `YTDLP_YOUTUBE_PLAYER_CLIENTS`: clientes de YouTube preferidos. Recomendado: `mweb,web_safari`
 - `YTDLP_YOUTUBE_RETRY_PLAYER_CLIENTS`: clientes de reintento si YouTube exige ruta alternativa. Recomendado: `web_safari,mweb`
+- `YTDLP_YOUTUBE_STREAM_ROUTES`: rutas de clientes que se prueban al resolver streams. Recomendado: `web_safari,mweb,mweb+web_safari,web_embedded,tv_simply,ios,android,android_vr`
+- `YTDLP_YOUTUBE_COOKIES_B64`: cookies de YouTube en formato Netscape codificadas en base64. Usar solo como secret de Render.
+- `YTDLP_YOUTUBE_COOKIES_PATH`: ruta a un archivo de cookies de YouTube ya montado.
+- `YTDLP_YOUTUBE_PO_TOKENS`: tokens PO para yt-dlp, separados por coma, por ejemplo `mweb.gvs+...`.
+- `YTDLP_YOUTUBE_VISITOR_DATA`: visitor data para casos donde se use PO token sin cookies.
 - `YTDLP_JS_RUNTIMES`: runtimes JS permitidos para resolver challenges. Recomendado en Spaces: `node`
 - `YTDLP_REMOTE_COMPONENTS`: componentes remotos para `yt-dlp`. Recomendado: `ejs:github`
 - `YTDLP_BGUTIL_BASE_URL`: URL del servidor HTTP del proveedor `bgutil`. Recomendado: `http://127.0.0.1:4416`
 - `YTDLP_BGUTIL_SERVER_HOME`: ruta del proveedor `bgutil` si quieres habilitar tambien su modo script
-- `PLAY_CANDIDATE_LIMIT`: cuantos candidatos probar al arrancar una busqueda por texto antes de elegir la primera pista reproducible. Recomendado: `4`
+- `YTDLP_OPERATION_TIMEOUT`: segundos maximos por operacion bloqueante de `yt-dlp`. Recomendado: `25`
+- `PLAY_CANDIDATE_LIMIT`: cuantos candidatos probar al arrancar una busqueda por texto antes de elegir la primera pista reproducible. Recomendado: `6`
 
 ## Ejecucion local
 

@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import asyncio
+import base64
 import logging
 import os
 import re
+from pathlib import Path
 from typing import Any
 
 import yt_dlp
@@ -51,6 +53,7 @@ class AudioService:
         self.logger = logger.getChild("audio")
         self.spotify_client = self._build_spotify_client()
         self.proxy_override = self._build_proxy_override()
+        self.youtube_cookiefile = self._build_youtube_cookiefile()
 
     def _build_spotify_client(self) -> Any | None:
         if not self.settings.spotify_client_id or not self.settings.spotify_client_secret:
@@ -92,6 +95,41 @@ class AudioService:
             self.logger.warning("Se detecto un proxy local invalido; yt-dlp lo ignorara para evitar fallos de red.")
             return ""
         return None
+
+    def _build_youtube_cookiefile(self) -> str | None:
+        configured_path = (self.settings.ytdlp_youtube_cookies_path or "").strip()
+        if configured_path:
+            path = Path(configured_path)
+            if path.exists():
+                self.logger.info("Cookies de YouTube habilitadas desde archivo configurado.")
+                return str(path)
+            self.logger.warning("YTDLP_YOUTUBE_COOKIES_PATH apunta a un archivo inexistente; se ignorara.")
+
+        cookie_text = (self.settings.ytdlp_youtube_cookies_text or "").strip()
+        cookie_b64 = (self.settings.ytdlp_youtube_cookies_b64 or "").strip()
+        if cookie_b64:
+            try:
+                cookie_text = base64.b64decode(cookie_b64).decode("utf-8")
+            except Exception:
+                self.logger.exception("No pude decodificar YTDLP_YOUTUBE_COOKIES_B64; se ignoraran esas cookies.")
+                cookie_text = ""
+
+        if not cookie_text:
+            return None
+
+        if "\\n" in cookie_text and "\n" not in cookie_text:
+            cookie_text = cookie_text.replace("\\n", "\n")
+
+        cookie_path = Path("./data/cache/youtube_cookies.txt")
+        try:
+            cookie_path.parent.mkdir(parents=True, exist_ok=True)
+            cookie_path.write_text(cookie_text.rstrip() + "\n", encoding="utf-8")
+        except OSError:
+            self.logger.exception("No pude escribir las cookies de YouTube en cache local.")
+            return None
+
+        self.logger.info("Cookies de YouTube habilitadas desde variables de entorno.")
+        return str(cookie_path)
 
     async def fetch_tracks(
         self,
@@ -377,24 +415,40 @@ class AudioService:
         return track
 
     def _extract_stream_info(self, webpage_url: str, source: str) -> dict[str, Any]:
-        stream_options = self._build_ydl_options(mode="stream", limit=1, source=source, direct_url=True)
-        try:
+        if source != "youtube":
+            stream_options = self._build_ydl_options(mode="stream", limit=1, source=source, direct_url=True)
             with yt_dlp.YoutubeDL(stream_options) as downloader:
                 return downloader.extract_info(webpage_url, download=False)
-        except Exception as exc:
-            translated = self._translate_lookup_error(source, exc)
-            if source != "youtube" or not self._should_retry_youtube_stream_resolution(str(translated)):
-                raise exc
 
-        retry_options = self._build_ydl_options(
-            mode="stream",
-            limit=1,
-            source=source,
-            direct_url=True,
-            youtube_retry=True,
-        )
-        with yt_dlp.YoutubeDL(retry_options) as downloader:
-            return downloader.extract_info(webpage_url, download=False)
+        last_error: Exception | None = None
+        for route_index, client_route in enumerate(self._youtube_stream_client_routes()):
+            stream_options = self._build_ydl_options(
+                mode="stream",
+                limit=1,
+                source=source,
+                direct_url=True,
+                youtube_retry=route_index > 0,
+                youtube_player_clients=client_route,
+            )
+            route_label = ",".join(client_route)
+            try:
+                with yt_dlp.YoutubeDL(stream_options) as downloader:
+                    info = downloader.extract_info(webpage_url, download=False)
+                stream_url, _ = self._extract_stream_candidate(info)
+                if stream_url:
+                    self.logger.info("YouTube stream resuelto con cliente(s): %s", route_label)
+                    return info
+                last_error = PlaybackError("YouTube no entrego un stream reproducible.")
+                self.logger.info("Ruta YouTube sin stream util: %s", route_label)
+            except Exception as exc:
+                last_error = exc
+                translated = self._translate_lookup_error(source, exc)
+                self.logger.info("Ruta YouTube fallida con cliente(s) %s: %s", route_label, translated)
+                continue
+
+        if last_error is not None:
+            raise last_error
+        raise PlaybackError("YouTube no entrego un stream reproducible.")
 
     def _build_ydl_options(
         self,
@@ -404,23 +458,30 @@ class AudioService:
         direct_url: bool,
         playlist_like: bool = False,
         youtube_retry: bool = False,
+        youtube_player_clients: list[str] | None = None,
     ) -> dict[str, Any]:
         options: dict[str, Any] = {
             "quiet": True,
             "no_warnings": True,
             "skip_download": True,
             "noplaylist": mode == "stream",
-            "socket_timeout": 20,
+            "socket_timeout": 10 if mode == "stream" else 20,
             "geo_bypass": True,
-            "extractor_retries": 2,
-            "file_access_retries": 2,
+            "force_ipv4": True,
+            "extractor_retries": 1 if mode == "stream" else 2,
+            "file_access_retries": 1 if mode == "stream" else 2,
         }
 
         if self.proxy_override is not None:
             options["proxy"] = self.proxy_override
+        if source == "youtube" and self.youtube_cookiefile:
+            options["cookiefile"] = self.youtube_cookiefile
 
         if source == "youtube":
             player_clients = (
+                youtube_player_clients
+                if youtube_player_clients is not None
+                else
                 self.settings.ytdlp_youtube_retry_player_clients
                 if youtube_retry
                 else self.settings.ytdlp_youtube_player_clients
@@ -433,6 +494,11 @@ class AudioService:
                     "base_url": [self.settings.ytdlp_bgutil_base_url],
                 },
             }
+            if self.settings.ytdlp_youtube_po_tokens:
+                extractor_args["youtube"]["po_token"] = self.settings.ytdlp_youtube_po_tokens
+            if self.settings.ytdlp_youtube_visitor_data:
+                extractor_args["youtube"]["visitor_data"] = [self.settings.ytdlp_youtube_visitor_data]
+                extractor_args["youtube"]["player_skip"] = ["webpage", "configs"]
             if self.settings.ytdlp_bgutil_server_home:
                 extractor_args["youtubepot-bgutilscript"] = {
                     "server_home": [self.settings.ytdlp_bgutil_server_home],
@@ -469,6 +535,26 @@ class AudioService:
             )
 
         return options
+
+    def _youtube_stream_client_routes(self) -> list[list[str]]:
+        raw_routes = self.settings.ytdlp_youtube_stream_routes or []
+        routes: list[list[str]] = []
+        seen: set[tuple[str, ...]] = set()
+
+        for raw_route in raw_routes:
+            clients = [item.strip() for item in re.split(r"[+|]", raw_route) if item.strip()]
+            if not clients:
+                continue
+            key = tuple(clients)
+            if key in seen:
+                continue
+            seen.add(key)
+            routes.append(clients)
+
+        if not routes:
+            routes.append(["web_safari"])
+            routes.append(["mweb"])
+        return routes
 
     def _build_target(self, query: str, source: str, limit: int) -> str:
         if is_url(query):
