@@ -472,6 +472,11 @@ class AudioService:
             "file_access_retries": 1 if mode == "stream" else 2,
         }
 
+        # Usar curl-cffi para impersonar TLS fingerprint de un navegador real
+        # Esto evita la deteccion por huella TLS en redes de datacenter (Render, AWS, etc.)
+        options["legacy_server_connect"] = False
+        options["impersonate"] = True
+
         if self.proxy_override is not None:
             options["proxy"] = self.proxy_override
         if source == "youtube" and self.youtube_cookiefile:
@@ -494,11 +499,21 @@ class AudioService:
                     "base_url": [self.settings.ytdlp_bgutil_base_url],
                 },
             }
+
+            # Configuracion de PO tokens y visitor_data
             if self.settings.ytdlp_youtube_po_tokens:
                 extractor_args["youtube"]["po_token"] = self.settings.ytdlp_youtube_po_tokens
             if self.settings.ytdlp_youtube_visitor_data:
                 extractor_args["youtube"]["visitor_data"] = [self.settings.ytdlp_youtube_visitor_data]
+
+            # Saltar webpage request si se configuro (reduce deteccion)
+            if self.settings.ytdlp_youtube_skip_webpage or self.settings.ytdlp_youtube_visitor_data:
                 extractor_args["youtube"]["player_skip"] = ["webpage", "configs"]
+
+            # Incluir formatos DASH explicitamente si se configuro
+            if self.settings.ytdlp_youtube_include_dash:
+                extractor_args["youtube"]["include_dash"] = ["true"]
+
             if self.settings.ytdlp_bgutil_server_home:
                 extractor_args["youtubepot-bgutilscript"] = {
                     "server_home": [self.settings.ytdlp_bgutil_server_home],
@@ -531,6 +546,7 @@ class AudioService:
                 # URL de video individual (no playlist): evitar que yt-dlp expanda playlist si tiene &list=
                 options["noplaylist"] = True
         else:
+            # Formato: priorizar audio-only, despues cualquier formato con audio, con soporte DASH
             options.update(
                 {
                     "format": "bestaudio[acodec!=none]/bestaudio/best",
@@ -648,7 +664,17 @@ class AudioService:
         if source == "youtube" and ("Private video" in message or "This video is not available" in message or "Video unavailable" in message):
             return PlaybackError("YouTube no permite esa pista porque esta privada o ya no esta disponible.")
         if source == "youtube" and "Sign in to confirm you" in message:
-            return PlaybackError("YouTube bloqueo temporalmente esta pista.")
+            return PlaybackError(
+                "YouTube bloqueo temporalmente esta pista desde este servidor. "
+                "El bot ya esta usando las medidas anti-bloqueo mas recientes "
+                "(PO tokens + bgutil + curl-cffi + multiples clientes). "
+                "Si el problema persiste, prueba con una cancion diferente o intentalo mas tarde."
+            )
+        if "HTTP Error 429" in message or "Too Many Requests" in message:
+            return PlaybackError(
+                "YouTube detecto demasiadas solicitudes desde este servidor. "
+                "Espera unos minutos y vuelve a intentar."
+            )
         if "No formats" in message or "Requested format is not available" in message:
             return PlaybackError(f"{source_label} no entrego un stream reproducible.")
 

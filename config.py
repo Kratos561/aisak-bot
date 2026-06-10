@@ -75,16 +75,22 @@ class Settings:
     lyrics_endpoint: str = field(default_factory=lambda: os.getenv("LYRICS_ENDPOINT", "https://api.lyrics.ovh/v1"))
     spotify_playlist_limit: int = field(default_factory=lambda: _get_int("SPOTIFY_PLAYLIST_LIMIT", 20))
     ytdlp_youtube_player_clients: list[str] = field(
-        default_factory=lambda: _get_csv("YTDLP_YOUTUBE_PLAYER_CLIENTS", "mweb,web_safari")
+        default_factory=lambda: _get_csv("YTDLP_YOUTUBE_PLAYER_CLIENTS", "ios,android,web_safari,mweb")
     )
     ytdlp_youtube_retry_player_clients: list[str] = field(
-        default_factory=lambda: _get_csv("YTDLP_YOUTUBE_RETRY_PLAYER_CLIENTS", "web_safari,mweb,web_embedded")
+        default_factory=lambda: _get_csv("YTDLP_YOUTUBE_RETRY_PLAYER_CLIENTS", "android,ios,web_safari,mweb,web_embedded,tv_simply,web")
     )
     ytdlp_youtube_stream_routes: list[str] = field(
         default_factory=lambda: _get_csv(
             "YTDLP_YOUTUBE_STREAM_ROUTES",
-            "web_safari,mweb,mweb+web_safari,web_embedded,tv_simply,ios,android,android_vr",
+            "ios,android,mweb,web_safari,web_embedded,tv_simply,android_vr,web",
         )
+    )
+    ytdlp_youtube_include_dash: bool = field(
+        default_factory=lambda: os.getenv("YTDLP_YOUTUBE_INCLUDE_DASH", "1").strip() in ("1", "true", "yes")
+    )
+    ytdlp_youtube_skip_webpage: bool = field(
+        default_factory=lambda: os.getenv("YTDLP_YOUTUBE_SKIP_WEBPAGE", "0").strip() in ("1", "true", "yes")
     )
     ytdlp_youtube_po_tokens: list[str] = field(default_factory=lambda: _get_csv("YTDLP_YOUTUBE_PO_TOKENS", ""))
     ytdlp_youtube_visitor_data: str | None = field(default_factory=lambda: os.getenv("YTDLP_YOUTUBE_VISITOR_DATA"))
