@@ -15,3 +15,27 @@ services:
         value: 1480142471697530933,1275282755063779459
       - key: LOG_LEVEL
         value: INFO
+      - key: YTDLP_OPERATION_TIMEOUT
+        value: "45"
+      - key: YTDLP_YOUTUBE_PLAYER_CLIENTS
+        value: mweb,web_safari
+      - key: YTDLP_YOUTUBE_RETRY_PLAYER_CLIENTS
+        value: web_safari,mweb,web_embedded
+      - key: YTDLP_YOUTUBE_STREAM_ROUTES
+        value: web_safari,mweb,mweb+web_safari,web_embedded,tv_simply,ios,android,android_vr
+      - key: YTDLP_JS_RUNTIMES
+        value: node
+      - key: YTDLP_REMOTE_COMPONENTS
+        value: "ejs:github"
+      - key: YTDLP_BGUTIL_BASE_URL
+        value: "http://127.0.0.1:4416"
+      - key: DEFAULT_VOLUME
+        value: "70"
+      - key: MAX_QUEUE_LENGTH
+        value: "100"
+      - key: INACTIVITY_TIMEOUT
+        value: "300"
+      - key: BOT_COLOR
+        value: "0x1f77b4"
+      - key: LYRICS_ENDPOINT
+        value: "https://api.lyrics.ovh/v1"

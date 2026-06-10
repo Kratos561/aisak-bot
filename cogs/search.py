@@ -126,7 +126,10 @@ class SearchCog(commands.Cog):
                 f"{self.bot.settings.lyrics_endpoint}/{quote(artist)}/{quote(title)}",
                 timeout=aiohttp.ClientTimeout(total=15),
             ) as response:
-                payload = await response.json(content_type=None)
+                try:
+                    payload = await response.json(content_type=None)
+                except Exception:
+                    payload = None
 
         lyrics = payload.get("lyrics") if isinstance(payload, dict) else None
         if not lyrics:

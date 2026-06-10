@@ -527,10 +527,13 @@ class AudioService:
                         "playlistend": max(1, limit),
                     }
                 )
+            else:
+                # URL de video individual (no playlist): evitar que yt-dlp expanda playlist si tiene &list=
+                options["noplaylist"] = True
         else:
             options.update(
                 {
-                    "format": "bestaudio[acodec!=none][protocol!=http_dash_segments]/bestaudio/best",
+                    "format": "bestaudio[acodec!=none]/bestaudio/best",
                 }
             )
 
@@ -573,7 +576,6 @@ class AudioService:
             if item.get("url")
             and item.get("acodec") not in (None, "none")
             and item.get("vcodec") == "none"
-            and not self._is_fragmented_stream_protocol(item)
         ]
         selected = self._pick_best_format(
             audio_only_formats,
@@ -599,7 +601,6 @@ class AudioService:
                 and item.get("acodec") not in (None, "none")
                 and item.get("vcodec") not in (None, "none")
                 and item.get("ext") == "mp4"
-                and not self._is_fragmented_stream_protocol(item)
                 and str(item.get("protocol", "")).startswith(("http", "m3u8"))
             ]
             selected = self._pick_best_format(
@@ -618,7 +619,6 @@ class AudioService:
             for item in formats
             if item.get("url")
             and item.get("acodec") not in (None, "none")
-            and not self._is_fragmented_stream_protocol(item)
         ]
         selected = self._pick_best_format(
             fallback_audio_formats,
@@ -722,7 +722,12 @@ class AudioService:
 
     def _is_fragmented_stream_protocol(self, format_info: dict[str, Any]) -> bool:
         protocol = str(format_info.get("protocol") or "").lower()
-        return protocol == "http_dash_segments"
+        if protocol == "http_dash_segments":
+            return True
+        # Algunos formatos nuevos de YouTube 2026 usan "m3u8_dash" u otros identificadores
+        if "dash" in protocol:
+            return True
+        return False
 
     def _audio_protocol_rank(self, format_info: dict[str, Any], *, prefer_hls: bool) -> int:
         protocol = str(format_info.get("protocol") or "").lower()
@@ -732,6 +737,10 @@ class AudioService:
             return 2
         if protocol.startswith(("m3u8", "hls")):
             return 1
+        # Los formatos DASH NO se excluyen del rank, solo se puntuan mas bajo
+        # para preferir formatos directos cuando existan
+        if "dash" in protocol:
+            return 0
         return 0
 
     def _normalize_headers(self, headers: dict[str, Any] | None) -> dict[str, str]:

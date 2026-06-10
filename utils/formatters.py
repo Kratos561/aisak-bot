@@ -38,7 +38,8 @@ def build_success_embed(title: str, description: str, color: int) -> discord.Emb
 
 
 def build_error_embed(message: str, color: int) -> discord.Embed:
-    return discord.Embed(title="Error", description=message, color=discord.Color.red() if color == 0 else color)
+    embed_color = discord.Color.red() if color == 0 else color
+    return discord.Embed(title="Error", description=message, color=embed_color)
 
 
 def build_track_embed(

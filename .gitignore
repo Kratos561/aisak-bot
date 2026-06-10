@@ -15,3 +15,14 @@ data/simulate_*.json
 .pytest_cache/
 .mypy_cache/
 scripts/__pycache__/
+
+# Cache temporal de ffmpeg/yt-dlp
+ffcache*
+
+# Vault de Obsidian (Cerebro) — no subir al repo
+index.md
+log.md
+conversacion.md
+decisiones.md
+credentials.md
+Resumen\ Ejecutivo.pdf

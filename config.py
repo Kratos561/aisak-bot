@@ -19,7 +19,19 @@ def _get_color(name: str, default: int) -> int:
     if raw_value is None or raw_value.strip() == "":
         return default
     try:
-        return int(raw_value, 16) if raw_value.lower().startswith("0x") else int(raw_value)
+        stripped = raw_value.strip()
+        if stripped.lower().startswith("0x"):
+            return int(stripped, 16)
+        # Si empieza con # (formato hex comun)
+        if stripped.startswith("#"):
+            return int(stripped[1:], 16)
+        # Si son solo hex (sin prefijo), probar como hex
+        try:
+            return int(stripped, 16)
+        except ValueError:
+            pass
+        # Fallback: intentar como entero decimal
+        return int(stripped)
     except ValueError:
         return default
 
@@ -84,7 +96,7 @@ class Settings:
     ytdlp_bgutil_base_url: str = field(default_factory=lambda: os.getenv("YTDLP_BGUTIL_BASE_URL", "http://127.0.0.1:4416"))
     ytdlp_bgutil_server_home: str | None = field(default_factory=lambda: os.getenv("YTDLP_BGUTIL_SERVER_HOME"))
     ytdlp_search_limit: int = field(default_factory=lambda: _get_int("YTDLP_SEARCH_LIMIT", 5))
-    ytdlp_operation_timeout: int = field(default_factory=lambda: _get_int("YTDLP_OPERATION_TIMEOUT", 25))
+    ytdlp_operation_timeout: int = field(default_factory=lambda: _get_int("YTDLP_OPERATION_TIMEOUT", 45))
     play_candidate_limit: int = field(default_factory=lambda: _get_int("PLAY_CANDIDATE_LIMIT", 6))
     test_guild_ids: list[int] = field(default_factory=_get_test_guild_ids)
 

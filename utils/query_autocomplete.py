@@ -42,7 +42,7 @@ async def build_query_choices(
                 limit=limit,
                 source="youtube" if source == "auto" else source,
             ),
-            timeout=2.8,
+            timeout=2.5,
         )
     except Exception:
         return []
