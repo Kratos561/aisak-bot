@@ -42,4 +42,4 @@ services:
       - key: YTDLP_YOUTUBE_INCLUDE_DASH
         value: "1"
       - key: YTDLP_YOUTUBE_SKIP_WEBPAGE
-        value: "0"
+        value: "1"

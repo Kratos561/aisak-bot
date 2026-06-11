@@ -90,7 +90,7 @@ class Settings:
         default_factory=lambda: os.getenv("YTDLP_YOUTUBE_INCLUDE_DASH", "1").strip() in ("1", "true", "yes")
     )
     ytdlp_youtube_skip_webpage: bool = field(
-        default_factory=lambda: os.getenv("YTDLP_YOUTUBE_SKIP_WEBPAGE", "0").strip() in ("1", "true", "yes")
+        default_factory=lambda: os.getenv("YTDLP_YOUTUBE_SKIP_WEBPAGE", "1").strip() in ("1", "true", "yes")
     )
     ytdlp_youtube_po_tokens: list[str] = field(default_factory=lambda: _get_csv("YTDLP_YOUTUBE_PO_TOKENS", ""))
     ytdlp_youtube_visitor_data: str | None = field(default_factory=lambda: os.getenv("YTDLP_YOUTUBE_VISITOR_DATA"))

@@ -506,9 +506,8 @@ class AudioService:
             if self.settings.ytdlp_youtube_visitor_data:
                 extractor_args["youtube"]["visitor_data"] = [self.settings.ytdlp_youtube_visitor_data]
 
-            # Saltar webpage request si se configuro (reduce deteccion)
-            if self.settings.ytdlp_youtube_skip_webpage or self.settings.ytdlp_youtube_visitor_data:
-                extractor_args["youtube"]["player_skip"] = ["webpage", "configs"]
+            # Saltar webpage request siempre (reduce deteccion de bots)
+            extractor_args["youtube"]["player_skip"] = ["webpage", "configs"]
 
             # Incluir formatos DASH explicitamente si se configuro
             if self.settings.ytdlp_youtube_include_dash:
@@ -678,7 +677,7 @@ class AudioService:
         if "No formats" in message or "Requested format is not available" in message:
             return PlaybackError(f"{source_label} no entrego un stream reproducible.")
 
-        return PlaybackError(f"{source_label} no pudo resolver esa solicitud.")
+        return PlaybackError(f"{source_label} no pudo resolver esa solicitud. ({message[:200]})")
 
     def _resolve_spotify_queries(self, match: re.Match[str]) -> list[str]:
         if self.spotify_client is None:
