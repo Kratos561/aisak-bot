@@ -24,7 +24,7 @@ services:
       - key: YTDLP_YOUTUBE_STREAM_ROUTES
         value: "ios,android,mweb,web_safari,web_embedded,tv_simply,android_vr,web"
       - key: YTDLP_JS_RUNTIMES
-        value: node
+        value: "node,deno"
       - key: YTDLP_REMOTE_COMPONENTS
         value: "ejs:github"
       - key: YTDLP_BGUTIL_BASE_URL

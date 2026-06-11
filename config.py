@@ -97,7 +97,7 @@ class Settings:
     ytdlp_youtube_cookies_path: str | None = field(default_factory=lambda: os.getenv("YTDLP_YOUTUBE_COOKIES_PATH"))
     ytdlp_youtube_cookies_text: str | None = field(default_factory=lambda: os.getenv("YTDLP_YOUTUBE_COOKIES_TEXT"))
     ytdlp_youtube_cookies_b64: str | None = field(default_factory=lambda: os.getenv("YTDLP_YOUTUBE_COOKIES_B64"))
-    ytdlp_js_runtimes: list[str] = field(default_factory=lambda: _get_csv("YTDLP_JS_RUNTIMES", "node"))
+    ytdlp_js_runtimes: list[str] = field(default_factory=lambda: _get_csv("YTDLP_JS_RUNTIMES", "node,deno"))
     ytdlp_remote_components: list[str] = field(default_factory=lambda: _get_csv("YTDLP_REMOTE_COMPONENTS", "ejs:github"))
     ytdlp_bgutil_base_url: str = field(default_factory=lambda: os.getenv("YTDLP_BGUTIL_BASE_URL", "http://127.0.0.1:4416"))
     ytdlp_bgutil_server_home: str | None = field(default_factory=lambda: os.getenv("YTDLP_BGUTIL_SERVER_HOME"))

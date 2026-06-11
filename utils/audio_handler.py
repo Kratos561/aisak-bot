@@ -5,6 +5,7 @@ import base64
 import logging
 import os
 import re
+import traceback
 from pathlib import Path
 from typing import Any
 
@@ -658,7 +659,11 @@ class AudioService:
             return exc
 
         message = str(exc)
+        exc_type = type(exc).__name__
+        tb = traceback.format_exc()
         source_label = format_source_label(source)
+
+        self.logger.warning("YouTube extraction error [%s]: %s\n%s", exc_type, message, tb)
 
         if source == "youtube" and ("Private video" in message or "This video is not available" in message or "Video unavailable" in message):
             return PlaybackError("YouTube no permite esa pista porque esta privada o ya no esta disponible.")
@@ -677,7 +682,7 @@ class AudioService:
         if "No formats" in message or "Requested format is not available" in message:
             return PlaybackError(f"{source_label} no entrego un stream reproducible.")
 
-        return PlaybackError(f"{source_label} no pudo resolver esa solicitud. ({message[:200]})")
+        return PlaybackError(f"{source_label} no pudo resolver esa solicitud. ({exc_type}: {message[:200]})")
 
     def _resolve_spotify_queries(self, match: re.Match[str]) -> list[str]:
         if self.spotify_client is None:
