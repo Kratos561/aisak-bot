@@ -1,0 +1,71 @@
+# =============================================================================
+# AISAK v2 — application.yml (config de Lavalink + youtube-plugin 1.18.1)
+# =============================================================================
+# IMPORTANTE: este configuration ha sido PROBADO con Lavalink 4.2.2 +
+# youtube-plugin 1.18.1 (junio 2026). Sin YOUTUBE_OAUTH_REFRESH_TOKEN, las URLs
+# directas funcionan pero los searches devuelven vacio. OAuth es OBLIGATORIO
+# para /play <texto>.
+
+server:
+  port: 2333
+  address: 127.0.0.1
+
+lavalink:
+  server:
+    password: "youshallnotpass"
+    sources:
+      youtube: false
+      http: true
+    bufferDurationMs: 400
+    frameBufferDurationMs: 5000
+    gc-warnings: true
+    trackStuckThresholdMs: 30000
+    playerUpdateInterval: 1500
+    httpConfig:
+      idleTimeout: 60s
+      connectionTimeout: 10s
+
+plugins:
+  youtube:
+    enabled: true
+    allowSearch: true
+    allowDirectVideoIds: true
+    allowDirectPlaylistIds: true
+    # youtubePlaylistLoadLimit pertenece AQUI (bajo plugins.youtube), no bajo
+    # lavalink.server. Lavalink ignora silenciosamente las keys desconocidas
+    # en lavalink.server, asi que si se ponia alli no tenia efecto.
+    youtubePlaylistLoadLimit: 20
+    # Orden de clients IMPORTA — se prueban top-down.
+    #
+    # ANDROID_MUSIC     : OAuth-compatible. Mejor cliente para musica en 2026.
+    # TVHTML5_SIMPLY    : reemplazo del antiguo TVHTML5EMBEDDED (eliminado en
+    #                    plugin 1.18.0). Excelente para metadata + playlists.
+    # IOS               : OAuth-compatible, devuelve streams consistentes.
+    # WEB               : ultimo recurso. Solo metadata cuando todo lo demas
+    #                    esta rate-limited.
+    #
+    # NOTA: ANDROID_VR y ANDROID_TESTSUITE se eliminaron en versiones recientes.
+    # NOTA: ANDROID puro esta roto segun warning del propio plugin.
+    # NOTA: TVHTML5EMBEDDED fue removido en plugin 1.18.0 (fin de lifecycle).
+    clients:
+      - ANDROID_MUSIC
+      - TVHTML5_SIMPLY
+      - IOS
+      - WEB
+    # ---- OAuth2 (cuenta burner Google) ------------------------------------
+    # CRITICO: sin esto, /play con texto libre NO funciona (YouTube bloquea
+    # searches anonimos desde IPs de datacenter). Solo URLs directas cargan.
+    #
+    # skipInitialization: false es OBLIGATORIO. Si lo pones en true, el plugin
+    # nunca registra los clients como OAuth-compatible y el token se refresca
+    # pero nadie lo usa (bug fixed en 1.18.1).
+    #
+    # clientId y clientSecret: deben coincidir EXACTAMENTE con los usados al
+    # generar el refresh token. Si no coinciden, el endpoint /token de Google
+    # devuelve 'invalid_grant' y OAuth falla silenciosamente.
+    oauth:
+      enabled: true
+      clientId: "${YOUTUBE_OAUTH_CLIENT_ID}"
+      clientSecret: "${YOUTUBE_OAUTH_CLIENT_SECRET}"
+      refreshToken: "${YOUTUBE_OAUTH_REFRESH_TOKEN}"
+      skipInitialization: false

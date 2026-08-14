@@ -1,0 +1,25 @@
+# =============================================================================
+# AISAK v2 — Python deps
+# =============================================================================
+# discord.py con [voice] trae PyNaCl y soporte de voz nativo.
+discord.py[voice]==2.7.1
+# wavelink: cliente Lavalink 4.x para discord.py. Pinned a 3.x porque la 4.x
+# todavia no es estable con discord.py 2.7.
+wavelink>=3.5.2,<4.0.0
+# Carga de .env desde archivo (local dev). En Render no se usa.
+python-dotenv==1.1.0
+# HTTP async para endpoints de diagnostico y para hablar con Lavalink REST.
+aiohttp==3.11.18
+# PyNaCl ya viene con discord.py[voice], pero lo fijamos por seguridad.
+PyNaCl==1.5.0
+# yt-dlp: fallback de emergencia cuando el youtube-plugin cae. Solo se carga
+# en memoria cuando hace falta (lazy import). Pinned a la version probada
+# (2026.6.9) que soporta el cliente tv_embedded y que esta instalada en el
+# venv de desarrollo — sin pin, un cambio mayor de yt-dlp podria romper el
+# fallback silenciosamente en un deploy nuevo.
+yt-dlp==2026.6.9
+# curl-cffi: motor de TLS impersonation que usa yt-dlp. Sin esto, YouTube
+# devuelve 403 a cualquier peticion desde un IP de cloud provider.
+# Pinned al >=0.7.0 (no version exacta: curl-cffi publica parches de
+# seguridad frecuentes que queremos heredar).
+curl-cffi>=0.7.0,<1.0.0

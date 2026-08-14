@@ -1,0 +1,41 @@
+services:
+  - type: web
+    name: aisak-bot
+    runtime: docker
+    plan: free
+    region: oregon
+    healthCheckPath: /health
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    autoDeploy: true
+    envVars:
+      # Obligatorios
+      - key: DISCORD_TOKEN
+        sync: false
+      - key: YOUTUBE_OAUTH_REFRESH_TOKEN
+        sync: false
+      - key: YOUTUBE_OAUTH_CLIENT_ID
+        sync: false
+      - key: YOUTUBE_OAUTH_CLIENT_SECRET
+        sync: false
+      - key: TEST_GUILD_IDS
+        sync: false
+      # Opcionales con defaults sanos
+      - key: LOG_LEVEL
+        value: INFO
+      - key: DEFAULT_VOLUME
+        value: "70"
+      - key: MAX_QUEUE_LENGTH
+        value: "100"
+      - key: INACTIVITY_TIMEOUT
+        value: "300"
+      - key: BOT_COLOR
+        value: "0x1f77b4"
+      - key: SEARCH_LIMIT
+        value: "5"
+      - key: EXTRACT_TIMEOUT
+        value: "25"
+      - key: BREAKER_THRESHOLD
+        value: "3"
+      - key: BREAKER_COOLDOWN
+        value: "60"
